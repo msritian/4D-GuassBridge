@@ -20,7 +20,7 @@ Status: todo · in progress · done · blocked
 | A3 Physics replay [A2] | Aditya | todo | — | |
 | A4–A7 | Aditya | todo | — | |
 | B1–B8 | Amogh | todo | — | |
-| C1 Geometry + trajectory core | Shivam | todo | — | needed by A2 and B1 |
+| C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Shivam | todo | — | needed by A2 and B1; no owner on the helper board |
 | C3–C9 | Shivam | todo | — | |
 
@@ -62,6 +62,46 @@ Diversity plot: `python scripts/plot_refs.py data/raw/StackCube-v1/dev StackCube
 * When `rrt_transport` is set, RRTConnect is used for every transport move (via, pre-place, final place), each
   falling back to screw motion if RRT fails to plan. The planner has no table/cube obstacles in either mode.
 * PickCube ignores `place_h` (recorded as 0 in the knobs file).
+
+## C1 — geometry + trajectory core
+
+**What's there** (all torch, any leading batch dims, differentiable; `Episode` stores numpy):
+* `geometry.py`: `quat_to_matrix`, `matrix_to_quat` (returns w ≥ 0), `quat_mul`, `matrix_to_rot6d`,
+  `rot6d_to_matrix`, `slerp`, `cube_symmetries` (24), `pose7_to_matrix`, `matrix_to_pose7`, `se3_inverse`,
+  `transform_gaussians`, `sapien_pose_to_viewmat` (hand camera from `camera_link`), `look_at_viewmat`, `fov_to_K`,
+  `project`.
+* `trajectory.py`: `Episode` (fields of CLAUDE.md §6.2, `.actions()`, `.save()/.load()` npz), `resample`,
+  `episode_to_motion` → `{x [128,4,10], ent_mask [4], log_dur}`, `known_mask(ent_mask, goal="full"|"objects"|"none")`,
+  `decode_motion` (differentiable, for guidance), `motion_to_episode`.
+
+**Tests** (`pytest -q tests/` in the CPU image: 10 tests, ~15 s; the first two files need only torch):
+* `test_geometry.py`: rotation/pose round trips incl. 180° turns and noisy 6D; cube group is 24 elements and closed;
+  moving Gaussians rotates their covariance as R Σ Rᵀ.
+* `test_trajectory.py`: resampling keeps endpoints exactly, follows a rotation whose quaternion flips sign midway,
+  and keeps the gripper command a clean ±1 step at the right time.
+* `test_sim_integration.py` (uses ManiSkill + A1): camera helpers reproduce ManiSkill's base/hand extrinsics and
+  intrinsics (1e-5) and project cube centres onto the cubes' segmentation pixels; a fresh planner demo (both tasks)
+  → Episode → npz → 128-step motion → Episode keeps length and endpoints and still solves the task in physics.
+
+**Round trip on all 24 A1 dev demos** (Episode → motion → Episode → replay `pd_joint_pos` + 10 hold steps):
+| Task | Replay success | Max joint path error | Max object end error |
+|---|---|---|---|
+| StackCube-v1 | 12/12 | 0.0015 rad | 3.9 mm |
+| PickCube-v1 | 12/12 | 0.0014 rad | 5.6 mm |
+
+PickCube's end error is mostly not from resampling: replaying measured qpos as targets (the §6.2 action definition)
+already gives up to 3.3 mm vs 0.7–2.0 mm with the planner's own actions. **A3: the 5 mm bound is tight for
+PickCube** (1/12 above it, success tolerance is 25 mm); consider 1 cm.
+
+**Decisions made:**
+* Gripper / attached are resampled by nearest sample (keeps endpoints exact); recorded in CLAUDE.md §6.3.
+* The robot token stores finger joint 1 only; decoding sets both fingers to it.
+* `matrix_to_quat` returns w ≥ 0 but ManiSkill quaternions can have w < 0: compare rotations, never raw quaternions.
+* Duration stats `LOG_DUR_MU = log 8`, `LOG_DUR_SIGMA = 0.35` are placeholders in `trajectory.py` until A4.
+* Pixel j covers u ∈ [j, j+1) (principal point W/2, H/2): index images with `floor(uv)`. Added to CLAUDE.md §4.
+
+**For the next tasks:** A2 can lift `_episode_from_shard` from `tests/test_sim_integration.py` (it is the extractor
+minus the attached rule); A3 can lift the replay loop from the same test.
 
 ## Findings that affect everyone
 
