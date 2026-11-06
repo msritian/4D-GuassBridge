@@ -118,6 +118,11 @@ python -m mani_skill.examples.demo_random_action -e StackCube-v1   # smoke test 
   `export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json` and create envs with
   `render_backend="sapien_cpu"`. Verified: motion planning, state extraction and small captures work this way.
   Use this for all planner data generation on CHTC **CPU** jobs (no GPU queue wait).
+  Needs a recent Mesa: Debian bookworm's Mesa 22.3 is rejected by SAPIEN ("Failed to find a supported physical
+  device"); Debian trixie (Mesa 25) works. The ICD file name is distro-specific (`lvp_icd.json` on trixie,
+  `lvp_icd.x86_64.json` on bookworm). Ready-made image: `docker/Dockerfile.cpu` (verified 2026-11-06).
+* **Macs:** `mplib` (the planner backend) has Linux x86_64 wheels only, so the motion planner cannot run natively
+  on macOS. Run `docker/Dockerfile.cpu` with `--platform linux/amd64` (works on Apple Silicon under emulation).
 
 ### 3.4 Dockerfile (one image for everything)
 
@@ -227,7 +232,7 @@ Tasks
 * **PickCube-v1**: default robot `panda` (`panda_v2.urdf`), only `base_camera` (same pose as above).
   Object `cube` (half 0.02), `goal_site` (hidden marker, appears in env_states as an actor).
   `extra` obs (rgb): `is_grasped`, `tcp_pose`, `goal_pos`. Success: cube within 0.025 m of goal **and** robot static.
-  `max_episode_steps=50` by default (too short for our demos; override).
+  `max_episode_steps=50` by default (too short for our demos; override). **StackCube-v1 also defaults to 50.**
 * Shadows are **off** by default (`enable_shadow=False`) → no baked-shadow problem in sim.
 * Panda `rest` keyframe qpos `[0, π/8, 0, −5π/8, 0, 3π/4, π/4, 0.04, 0.04]`. Joint limits (rad):
   low `[-2.8973,-1.7628,-2.8973,-3.0718,-2.8973,-0.0175,-2.8973]`, high `[2.8973,1.7628,2.8973,-0.0698,2.8973,3.7525,2.8973]`;
