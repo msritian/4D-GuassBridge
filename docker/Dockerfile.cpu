@@ -1,0 +1,12 @@
+# CPU-only image for simulation and planner data (laptops incl. Apple Silicon via --platform linux/amd64,
+# CHTC CPU jobs). Software Vulkan (lavapipe); no CUDA, no gsplat. GPU work uses the image in CLAUDE.md §3.4.
+#   docker build --platform linux/amd64 -f docker/Dockerfile.cpu -t gaussbridge-cpu:0.2 .
+#   docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work gaussbridge-cpu:0.2 pytest -q
+FROM python:3.11-slim-trixie
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libvulkan1 mesa-vulkan-drivers vulkan-tools libegl1 libgl1 libglib2.0-0 libx11-6 libxext6 git \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir mani_skill==3.0.1 "numpy<2" h5py pytest matplotlib
+ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json \
+    MS_SKIP_ASSET_DOWNLOAD_PROMPT=1 PYTHONPATH=/work/src

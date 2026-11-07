@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# GaussBridge generated data (lives on CHTC staging, not in git)
+data/
