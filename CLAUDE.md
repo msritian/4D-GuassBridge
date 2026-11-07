@@ -210,6 +210,8 @@ Checkpoint every ≤ 1 h so short/resumable jobs can be resumed.
 * **Cameras:** OpenCV convention (x right, y down, z forward). `viewmat` = world→camera 4×4 (what gsplat wants).
   ManiSkill gives `sensor_param[cam]["extrinsic_cv"]` as **[3,4]** (pad to 4×4) and `intrinsic_cv` [3,3].
   `CameraConfig.fov` is the **vertical** FoV (`set_fovy`). Depth from ManiSkill is uint16 **millimetres** (0 = invalid).
+  Intrinsics: `f = (H/2)/tan(fovy/2)`, principal point `(W/2, H/2)`, so pixel j covers u ∈ [j, j+1): index images
+  with `floor(uv)` (verified against ManiSkill `intrinsic_cv` and segmentation, 2026-11-06).
 * **SAPIEN camera/link frame → OpenCV:** `R_cv_from_sapien = [[0,-1,0],[0,0,-1],[1,0,0]]`;
   `viewmat = inv(T_world_cam_sapien · diag(R_cv_from_sapienᵀ, 1))`. Verified against ManiSkill's hand camera
   extrinsic to 1e-7.
@@ -279,6 +281,9 @@ never hard-code ids. `panda_hand_tcp` and `camera_base_link` have no visual geom
 
 Round-trip check (verified): planner episode → 128-step motion tensor → back to 20 Hz → replay `pd_joint_pos`
 actions in sim: **21/21 successes**, max joint error 0.009 rad, max object end error 3.6 mm. So N = 128 is enough.
+Re-verified 2026-11-06 with `trajectory.py` on 12 StackCube + 12 PickCube randomised demos (+10 hold steps): 24/24,
+joint error ≤ 0.0015 rad, object end error ≤ 3.9 mm (StackCube) / 5.6 mm (PickCube; replaying measured-qpos actions
+without resampling already gives up to 3.3 mm).
 
 Custom cameras: subclass the task and override the `_default_sensor_configs` **property**, keep the policy camera
 first, register with `@register_env("StackCubeCapture-v1", max_episode_steps=400)`. After `robot.set_qpos(...)` or
@@ -366,7 +371,7 @@ Extraction: `robot_qpos = env_states/articulations/<uid>[:, 13:22]`, `base_pose 
 `obj_pose = env_states/actors/<name>[:, :7]`, `gripper_cmd = actions[:, -1]` (+ repeat last).
 
 ### 6.3 Motion tensor (model space)
-* N = 128 normalised steps (linear resampling for qpos/positions, slerp for rotations, zero-order hold for
+* N = 128 normalised steps (linear resampling for qpos/positions, slerp for rotations, nearest sample for
   gripper/attached; endpoints preserved exactly). E = 1 + K_MAX entities (K_MAX = 3; robot = slot 0). F = 10:
   * robot token: `[q_norm(7) = 2(q−lo)/(hi−lo)−1, finger_norm = finger/0.04·2−1, gripper_cmd, 0]`
   * object token: `[(p − c)/s (3) with c=(0,0,0.1), s=0.3, rot6d (6), attached·2−1]`
