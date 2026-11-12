@@ -1,0 +1,30 @@
+# CPU tests on Linux for every PR / push to main. Same base and Vulkan setup as docker/Dockerfile.cpu
+# (Debian trixie, Mesa lavapipe), so code that only works on one teammate's laptop fails here first.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  cpu-tests:
+    runs-on: ubuntu-latest
+    container: python:3.11-slim-trixie
+    timeout-minutes: 30
+    env:
+      VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.json
+      MS_SKIP_ASSET_DOWNLOAD_PROMPT: "1"
+    steps:
+      - name: System packages (software Vulkan)
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            libvulkan1 mesa-vulkan-drivers libegl1 libgl1 libglib2.0-0 libx11-6 libxext6 git
+      - uses: actions/checkout@v4
+      - name: Python packages
+        run: |
+          pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -e ".[dev]"
+      - name: Tests
+        run: pytest -q

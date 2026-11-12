@@ -123,6 +123,10 @@ python -m mani_skill.examples.demo_random_action -e StackCube-v1   # smoke test 
   `lvp_icd.x86_64.json` on bookworm). Ready-made image: `docker/Dockerfile.cpu` (verified 2026-11-06).
 * **Macs:** `mplib` (the planner backend) has Linux x86_64 wheels only, so the motion planner cannot run natively
   on macOS. Run `docker/Dockerfile.cpu` with `--platform linux/amd64` (works on Apple Silicon under emulation).
+* **Windows (NVIDIA):** ManiSkill + gsplat work natively, planner does not (no mplib). Use `render_backend="sapien_cpu"`
+  (the default `sapien_cuda` crashes in `get_picture_cuda`; `sapien_cpu` still renders on the GPU). Install torch from
+  the cu124 index (PyPI torch is CPU-only on Windows) and build gsplat 1.5.3 from source (the PyPI wheel's JIT build
+  passes a GCC flag to MSVC). Full recipe: `progress.md` → "Windows setup" (verified 2026-11-10).
 
 ### 3.4 Dockerfile (one image for everything)
 
