@@ -404,7 +404,10 @@ background = its captured pose.
 
 ### 7.2 Articulated multi-configuration reconstruction (one optimiser for every case)
 A **configuration** = one static arrangement captured from C cameras: `{rgb [C,H,W,3], depth [C,H,W] m, seg [C,H,W]
-part index (−1 ignore), viewmats [C,4,4], Ks [C,3,3], part_T [P,4,4]}`. Optimise one canonical Gaussian set per part:
+part index (−1 ignore), viewmats [C,4,4], Ks [C,3,3], part_T [P,4,4]}`. As built (`sim/capture.py::capture_state`,
+2026-11-11): cameras differ in resolution, so it is a dict `cameras[uid] = {rgb, depth, seg, viewmat, K}` (policy
+cameras first) plus `part_names, part_kinds, part_T, qpos`. Parts = `part_table(env)` (seg-id order: robot links, then
+table-workspace, ground, objects; PickCube's hidden `goal_site` excluded). Optimise one canonical Gaussian set per part:
 for each sampled training view, pose all parts with that configuration's `part_T`, render, compute loss.
 * **Init:** back-project valid depth pixels of each part into its canonical frame (`x_can = T_part⁻¹ x_world`),
   subsample ≤ 20k points per part, colour from RGB, scale = mean 3-NN distance (clamp 0.1 mm–5 cm), opacity 0.1.
@@ -421,7 +424,13 @@ Uses:
    to limits−0.05, reject if any link origin below z = 2 cm), fingers U[0,0.04]; objects 50% resting with random yaw,
    50% floating 8–25 cm with random rotation (so bottoms are seen), ≥ 12 cm from robot links. Cameras: 12 azimuths ×
    elevations {20°,45°,70°} = 36 views, radius 1.1 m around `[-0.15, 0, 0.15]`, 256×256, vfov 60°. Policy cameras of
-   two extra configurations = held-out test views. Output: robot links + objects + background `PartSplats`
+   two extra configurations = held-out test views.
+   **Added 2026-11-11 (`sim/envs.py::RINGS`):** a close ring (8 azimuths × {30°,60°}, r = 0.5 m around
+   `[-0.05, 0, 0.08]`, 256², ≈ 2.3 mm/px vs ≈ 5 mm/px for the wide ring) because the hand camera sees cubes and
+   fingers from a few cm; and the policy cameras render in every training configuration too (they are part of the
+   capture env). StackCube: 54 cameras per configuration, 0.34 s per capture on an RTX 4060.
+   Note the wide ring is entirely above the objects (lowest camera ≈ 0.53 m), so floating objects do not reveal
+   their bottoms; random object rotations only help once lighting is modelled (§7.3). Output: robot links + objects + background `PartSplats`
    (`assets/<env_id>/scene.splats.pt`) and per-object shape points (`assets/<env_id>/<obj>.points.npy`).
 2. **Scene mode (the real use case):** only the START and END captures of one episode (2 configurations). Used to
    evaluate how good a reconstruction from two snapshots is. Option: merge the pre-built robot asset (a robot is a
@@ -435,6 +444,15 @@ For part p with `T_p`: `μ_w = R_p μ + t_p`, `q_w = q(R_p) ⊗ q` (covariance `
 **Colour:** evaluate SH with the view direction in the part frame, `d_local = R_pᵀ(μ_w − campos)`, add 0.5, clamp,
 and pass `[C,N,3]` colours with `sh_degree=None` (gsplat does not rotate SH). Render `render_mode="RGB+ED"`,
 `packed=False`, near 0.01, far 10.
+**Lighting (measured 2026-11-11, `scripts/check_lighting.py`, `results/lighting/`):** ManiSkill's `minimal` shader
+lights surfaces with world-fixed lights (ambient 0.3, directional `[1,1,-1]` and `[0,0,-1]`, from
+`BaseEnv._load_lighting`), then gamma 1/2.2 and clamp. Rotating a part and the camera together (identical part-frame
+geometry and view, mask IoU 1.0) still changes its pixels: cube up to 12/255 mean abs (21 dB on cube pixels, a side
+face's red channel 147↔196), arm via joint 1 up to 16/255 (≈ 30 dB within ±60°, 21.5 dB at 150°). A part-frame
+colour model cannot represent this, and cube yaw is random every episode. **Planned (B3/B4, owner Amogh):**
+per-Gaussian albedo + part-frame normal, colour = `clamp((albedo·(ambient + Σᵢ eᵢ·max(0, (R_p n)·lᵢ)) + SH
+residual)^(1/2.2))` with the known light directions and learnable intensities; normals initialised from depth.
+ManiSkill's `default` shader pack can render `normal` and `albedo` textures for supervision.
 Outputs per frame and camera:
 * RGB (clamp to [0,1] only when saving), expected depth, alpha;
 * part/group labels: one-hot group channels → argmax where alpha > 0.5;

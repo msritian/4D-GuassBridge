@@ -82,7 +82,7 @@ Status legend: todo · in progress · blocked · done
 
 ## Workstream B: Gaussians & rendering
 
-### B1 Capture environments — deps S0.2 — Status: todo
+### B1 Capture environments — deps S0.2 — owner: Amogh — Status: done (2026-11-11), 99.94% reprojection agreement, see progress.md
 - `sim/envs.py`: `StackCubeCapture-v1`, `PickCubeCapture-v1` (§7.2 ring: 12 az × {20,45,70}°, r = 1.1 m, target
   [-0.15,0,0.15], 256², vfov 60°) keeping policy cameras; tables `OBJECTS`, `POLICY_CAMERAS`, `DEFAULT_ROBOT`.
 - `sim/capture.py`: `part_table(env)` from `segmentation_id_map`, `part_poses`, `capture_state` (rgb, depth m, seg →

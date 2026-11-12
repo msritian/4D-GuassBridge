@@ -41,6 +41,20 @@ def test_cube_symmetries_form_a_group():
     assert products == {tuple(m.flatten().tolist()) for m in S}  # closed under composition
 
 
+def test_backproject_inverts_project():
+    gen = torch.Generator().manual_seed(2)
+    V = G.look_at_viewmat(torch.tensor([0.4, -0.3, 0.7], dtype=torch.float64), [0.0, 0.1, 0.05])
+    K = G.fov_to_K(math.radians(60), 64, 48).double()
+    rows = torch.randint(0, 48, (200,), generator=gen)
+    cols = torch.randint(0, 64, (200,), generator=gen)
+    depth = 0.3 + torch.rand(48, 64, generator=gen, dtype=torch.float64)
+    pts = G.backproject(depth, V, K, rows, cols)
+    uv, z = G.project(pts, V, K)
+    torch.testing.assert_close(z, depth[rows, cols])
+    torch.testing.assert_close(uv, torch.stack([cols, rows], -1).double() + 0.5)  # pixel centres
+    assert torch.equal(uv.floor().long(), torch.stack([cols, rows], -1))
+
+
 def test_transform_gaussians_rotates_covariance():
     gen = torch.Generator().manual_seed(1)
     means = torch.randn(50, 3, generator=gen, dtype=torch.float64)

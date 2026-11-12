@@ -19,7 +19,7 @@ Status: todo · in progress · done · blocked
 | A2 Extraction to Episodes | Aditya | todo | — | needs C1 (Episode format) and C2 (FK for the gripper position) |
 | A3 Physics replay [A2] | Aditya | todo | — | |
 | A4–A7 | Aditya | todo | — | |
-| B1 Capture environments | Amogh | in progress (2026-11-11) | — | branch `amogh/c2-b1` |
+| B1 Capture environments | Amogh | done (2026-11-11) | `src/gaussbridge/sim/envs.py`, `src/gaussbridge/sim/capture.py`, `geometry.backproject`, `tests/test_capture.py`, `scripts/check_lighting.py`, `results/lighting/` | reprojection agreement 99.94–99.96%; lighting confirmed (21 dB cap); see B1 below |
 | B2–B8 | Amogh | todo | — | |
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
@@ -131,6 +131,31 @@ only). `qpos [..., 9]` in ManiSkill order, any batch dims, differentiable; `base
 
 Also tested: batch shapes `[2, 3, 9]`, base-pose shift, gradients w.r.t. joint angles. Speed: 26 ms for 4096
 configs (all links, CPU). **A2** can use `tcp_pose` for the attached rule; **B1/B5** use `hand_camera_viewmat`.
+
+## B1 — capture environments
+
+* `import gaussbridge.sim.envs` registers `StackCubeCapture-v1` / `PickCubeCapture-v1` (task env + capture rings;
+  `capture_rings=` kwarg to change them). Tables: `OBJECTS`, `POLICY_CAMERAS`, `DEFAULT_ROBOT`, `CAPTURE_ENV`.
+  Default rings (`RINGS`): wide 36 cams (CLAUDE.md §7.2) + close 16 cams (r 0.5 m, ≈ 2.3 mm/px) + policy cameras
+  = 54 cameras for StackCube, 53 for PickCube; 0.34 s / 0.21 s per capture (RTX 4060, `sapien_cpu`).
+* `capture.part_table(env)` → `Part(name, kind, seg_id)` from `segmentation_id_map` (StackCube 19 parts, PickCube 18;
+  PickCube's panda has finger pads and no camera links). `capture_state(env)` → dict per camera
+  `{rgb uint8, depth float32 m, seg int16 part index (-1 none), viewmat, K}` (policy cameras first; ManiSkill itself
+  lists `hand_camera` last) + `part_names, part_kinds, part_T, qpos`. `geometry.backproject` = inverse of `project`.
+* Depth from the `minimal` shader is camera-z in whole millimetres (int16), so 1 mm quantisation.
+
+**Acceptance** (`tests/test_capture.py`): points back-projected from one camera, carried with their part's pose and
+projected into another camera land on their own part's pixels wherever visible (5 mm depth test):
+| Check | Agreement (all parts) | Worst part |
+|---|---|---|
+| Same configuration, 60 random camera pairs | 99.94% | cubeA 98.3% (edges touching the table) |
+| After moving the arm (±0.5 rad) and cubeA (lifted, yawed), 60 pairs | 99.96% | panda_link0 97.9% |
+Hand camera viewmat from `PandaFK` = capture viewmat (< 1e-5). Tests assert > 99.5% overall and > 95% per part.
+
+**Lighting check** (`python scripts/check_lighting.py --out results/lighting`): rotate a part and the camera together
+(same part-frame geometry and view, mask IoU 1.0): cubeA pixels change up to 12/255 mean (21 dB), arm (joint 1) up to
+16/255 (≈ 30 dB within ±60°, 21.5 dB at 150°). So the §7.3 part-frame SH colour model is capped near 21 dB on cubes
+→ lighting-aware colour planned for B3/B4 (CLAUDE.md §7.3).
 
 ## Windows setup (Amogh, 2026-11-10; RTX 4060 Laptop 8 GB, driver 616.56)
 
