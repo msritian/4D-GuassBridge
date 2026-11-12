@@ -17,6 +17,12 @@ OBJECTS = {"StackCube-v1": ["cubeA", "cubeB"], "PickCube-v1": ["cube"]}
 POLICY_CAMERAS = {"StackCube-v1": ["base_camera", "hand_camera"], "PickCube-v1": ["base_camera"]}
 DEFAULT_ROBOT = {"StackCube-v1": "panda_wristcam", "PickCube-v1": "panda"}
 CAPTURE_ENV = {"StackCube-v1": "StackCubeCapture-v1", "PickCube-v1": "PickCubeCapture-v1"}
+CUBE_HALF_SIZE = 0.02  # every v1 object is a 4 cm cube
+# Robot qpos at episode start before ManiSkill's 0.02 noise (TableSceneBuilder.initialize): joint 7 differs per robot
+HOME_QPOS = {
+    "panda": (0.0, math.pi / 8, 0.0, -5 * math.pi / 8, 0.0, 3 * math.pi / 4, math.pi / 4, 0.04, 0.04),
+    "panda_wristcam": (0.0, math.pi / 8, 0.0, -5 * math.pi / 8, 0.0, 3 * math.pi / 4, -math.pi / 4, 0.04, 0.04),
+}
 
 
 @dataclasses.dataclass(frozen=True)

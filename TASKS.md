@@ -90,7 +90,7 @@ Status legend: todo · in progress · blocked · done
 - Acceptance: test projecting each part's depth-backprojected points with `viewmat`/`K` lands on its seg mask
   (> 99% pixels); hand-camera viewmat from FK equals ManiSkill extrinsic (< 1e-5).
 
-### B2 Asset-mode captures — deps B1 — Status: todo
+### B2 Asset-mode captures — deps B1 — owner: Amogh — Status: done (2026-11-11), weakest link in 71 views, see progress.md
 - `random_configs` (§7.2: 8 configs, robot noise ±0.6, link-height rejection, objects resting/floating) + 2 held-out
   configs; save as torch files to staging.
 - Acceptance: a contact sheet image of 4 configs × 4 views; every visual robot link appears in ≥ 20 views.

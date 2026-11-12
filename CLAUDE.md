@@ -430,7 +430,18 @@ Uses:
    fingers from a few cm; and the policy cameras render in every training configuration too (they are part of the
    capture env). StackCube: 54 cameras per configuration, 0.34 s per capture on an RTX 4060.
    Note the wide ring is entirely above the objects (lowest camera ≈ 0.53 m), so floating objects do not reveal
-   their bottoms; random object rotations only help once lighting is modelled (§7.3). Output: robot links + objects + background `PartSplats`
+   their bottoms; random object rotations only help once lighting is modelled (§7.3).
+   **As built (B2, 2026-11-11, `sim/capture.py`, `scripts/capture_assets.py`):** "rest" = the env's own start qpos
+   `HOME_QPOS` (`sim/envs.py`; joint 7 = −π/4 for `panda_wristcam`, +π/4 for `panda`, from `TableSceneBuilder`), both
+   fingers equal; the link-height check uses link origins `panda_link1..7, panda_hand, panda_hand_tcp` (FK); the
+   12 cm object clearance is to the segments joining those origins; objects ≥ 8 cm apart, xy ∈ [−0.2, 0.15] ×
+   [−0.2, 0.2]. Train configs use rng `[seed, 0]`, held-out `[seed, 1]`. One file per task
+   (`capture_configs` → `save_captures`): per camera `rgb [R,H,W,3] u8, depth_mm [R,H,W] i16, seg [R,H,W] i8,
+   viewmat [R,4,4], K, valid [R]` + `qpos, obj_pose, floating, part_T [R,P,4,4], part_names/kinds/visual, split,
+   meta` (git commit); `config_state(cap, r)` gives the B1 `capture_state` format. ≈ 197 MB per task (10 configs).
+   **Invalid views:** the arm can swing into a close-ring camera (eye inside a link: one part fills the frame at a
+   few cm). `valid = False` when one part fills ≥ 90% of the view with median depth < 10 cm; reconstruction must
+   skip those views (StackCube seed 0: 4 of 540). Output: robot links + objects + background `PartSplats`
    (`assets/<env_id>/scene.splats.pt`) and per-object shape points (`assets/<env_id>/<obj>.points.npy`).
 2. **Scene mode (the real use case):** only the START and END captures of one episode (2 configurations). Used to
    evaluate how good a reconstruction from two snapshots is. Option: merge the pre-built robot asset (a robot is a

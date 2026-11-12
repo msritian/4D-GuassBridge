@@ -20,7 +20,8 @@ Status: todo · in progress · done · blocked
 | A3 Physics replay [A2] | Aditya | todo | — | |
 | A4–A7 | Aditya | todo | — | |
 | B1 Capture environments | Amogh | done (2026-11-11) | `src/gaussbridge/sim/envs.py`, `src/gaussbridge/sim/capture.py`, `geometry.backproject`, `tests/test_capture.py`, `scripts/check_lighting.py`, `results/lighting/` | reprojection agreement 99.94–99.96%; lighting confirmed (21 dB cap); see B1 below |
-| B2–B8 | Amogh | todo | — | |
+| B2 Asset-mode captures | Amogh | done (2026-11-11) | `sim/capture.py` (`random_configs`, `apply_config`, `capture_configs`, `view_valid`, save/load), `scripts/capture_assets.py`, `tests/test_configs.py`, `results/b2/` | every visual robot link in ≥ 67 training views (need 20); see B2 below |
+| B3–B8 | Amogh | todo | — | |
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
 | C3–C9 | Shivam | todo | — | |
@@ -156,6 +157,30 @@ Hand camera viewmat from `PandaFK` = capture viewmat (< 1e-5). Tests assert > 99
 (same part-frame geometry and view, mask IoU 1.0): cubeA pixels change up to 12/255 mean (21 dB), arm (joint 1) up to
 16/255 (≈ 30 dB within ±60°, 21.5 dB at 150°). So the §7.3 part-frame SH colour model is capped near 21 dB on cubes
 → lighting-aware colour planned for B3/B4 (CLAUDE.md §7.3).
+
+## B2 — asset-mode captures
+
+```bash
+python scripts/capture_assets.py --task StackCube-v1 --out data/assets/StackCube-v1/captures.pt     --sheet results/b2/StackCube-v1_sheet.png      # 8 train + 2 held-out configs, seed 0
+```
+Runs anywhere ManiSkill renders (laptop, CHTC CPU job with lavapipe, GPU job); output is **one file per task**
+(fits the "few big files" staging rule) + `<out>.report.json`. Load with `capture.load_captures(path)`;
+`capture.config_state(cap, r)` returns configuration r in the B1 `capture_state` format. Format: CLAUDE.md §7.2.
+
+* `random_configs(task, n, seed)` (no simulator needed, FK only): CLAUDE.md §7.2 asset-mode distribution around the
+  env's own start pose (`envs.HOME_QPOS`: joint 7 is −π/4 for `panda_wristcam`, +π/4 for `panda`).
+* **Invalid views:** with ±0.6 rad noise the arm sometimes swings into a close-ring camera (eye inside a link, the
+  frame is one flat grey surface). Each (configuration, camera) gets `valid`; false when one part fills ≥ 90% of the
+  view with median depth < 10 cm. Reconstruction (B4) must skip them. Seed 0: StackCube 4/540, PickCube 2/530.
+
+**Acceptance** (`results/b2/<task>.report.json`, contact sheets `results/b2/<task>_sheet.png`):
+| Task | Cameras | Capture time (10 configs) | File | Weakest visual robot link (train views ≥ 50 px) | Objects |
+|---|---|---|---|---|---|
+| StackCube-v1 | 54 | 2.7 s | 197 MB | panda_leftfinger 71 (others 156–338) | cubeA 353, cubeB 364 |
+| PickCube-v1 | 53 | 3.0 s | 196 MB | panda_leftfinger 67 (others 69–330) | cube 381 |
+Tests: `tests/test_configs.py` (limits, link heights, clearances, resting/floating, determinism, `view_valid`);
+`tests/test_capture.py::test_capture_configs_apply_reproject_and_roundtrip` (applied poses equal config + FK,
+reprojection between two different configurations > 99.5%, save/load round trip). Full suite: 19 passed.
 
 ## Windows setup (Amogh, 2026-11-10; RTX 4060 Laptop 8 GB, driver 616.56)
 

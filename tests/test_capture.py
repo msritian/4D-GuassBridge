@@ -10,7 +10,17 @@ pytest.importorskip("mani_skill")
 import gymnasium as gym
 from mani_skill.utils.structs.pose import Pose
 
-from gaussbridge.sim.capture import IGNORE, capture_state, part_table, reprojection_agreement
+from gaussbridge.sim.capture import (
+    IGNORE,
+    capture_configs,
+    capture_state,
+    config_state,
+    load_captures,
+    part_table,
+    random_configs,
+    reprojection_agreement,
+    save_captures,
+)
 from gaussbridge.sim.envs import OBJECTS, POLICY_CAMERAS, RINGS, capture_camera_names
 from gaussbridge.sim.kinematics import PandaFK
 
@@ -97,6 +107,37 @@ def test_reprojection_after_moving_robot_and_cube(stack_env):
     total, per_part = _total([reprojection_agreement(s1, a, s2, b) for a, b in pairs])
     assert total > 0.995, total  # measured 0.9996
     assert min(per_part.values()) > 0.95, per_part
+
+
+def test_capture_configs_apply_reproject_and_roundtrip(stack_env, tmp_path):
+    """B2: configurations are applied exactly, captures of different configurations are geometrically consistent,
+    and the stacked file round-trips."""
+    cfgs = random_configs("StackCube-v1", 2, [7, 0])
+    cams = ["base_camera", "hand_camera", "wide_e45_a00", "wide_e45_a06", "close_e30_a02", "close_e60_a05"]
+    cap = capture_configs(stack_env, cfgs, ["train", "heldout"], cameras=cams)
+    assert list(cap["cameras"]) == cams and cap["cameras"]["wide_e45_a00"]["rgb"].shape == (2, 256, 256, 3)
+    fk = PandaFK("panda_wristcam", dtype=torch.float64)
+    names = cap["part_names"]
+    for r, c in enumerate(cfgs):
+        torch.testing.assert_close(cap["qpos"][r], c["qpos"], atol=1e-6, rtol=0)
+        links = fk.link_poses(c["qpos"].double(), links=["panda_link5", "panda_hand"])
+        for k in links:
+            torch.testing.assert_close(cap["part_T"][r, names.index(k)].double(), links[k], atol=1e-5, rtol=0)
+        for k, o in enumerate(OBJECTS["StackCube-v1"]):
+            torch.testing.assert_close(cap["part_T"][r, names.index(o), :3, 3], c["obj_pose"][k, :3], atol=1e-6,
+                                       rtol=0)
+    s0, s1 = config_state(cap, 0), config_state(cap, 1)
+    total, per_part = _total([reprojection_agreement(s0, a, s1, b) for a in cams for b in cams])
+    assert total > 0.995, total
+    assert min(per_part.values()) > 0.95, per_part
+    path = tmp_path / "cap.pt"
+    save_captures(path, cap, {"task": "StackCube-v1"})
+    back = load_captures(path)
+    assert back["meta"]["task"] == "StackCube-v1" and back["split"] == ["train", "heldout"]
+    for uid in cams:
+        for key in ("rgb", "depth_mm", "seg", "viewmat", "valid"):
+            assert torch.equal(back["cameras"][uid][key], cap["cameras"][uid][key])
+    assert [p.visual for p in part_table(stack_env)][names.index("panda_hand_tcp")] is False
 
 
 def test_hand_camera_from_fk_matches_capture(stack_env):
