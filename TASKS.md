@@ -11,7 +11,7 @@ Status legend: todo · in progress · blocked · done
 
 ## Week 0–1: setup (everyone, Nov 9–11)
 
-### S0.1 Repo + conventions — owner: Shivam — Status: todo
+### S0.1 Repo + conventions — owner: Amogh (was Shivam) — Status: done on Windows + CI (2026-11-11), see progress.md
 - Create the GitHub repo with the layout in §11 (empty modules + `pyproject.toml`, `src/` package, pytest, ruff).
 - Add `CLAUDE.md`, `TASKS.md`; README with the 5-line quick start.
 - Acceptance: `pip install -e . && pytest` runs (0 tests OK) on all three laptops.
@@ -33,7 +33,7 @@ Status legend: todo · in progress · blocked · done
 
 ## Workstream A: simulation & data
 
-### A1 Randomised planner generator — deps S0.2 — Status: todo
+### A1 Randomised planner generator — deps S0.2 — owner: Aditya — Status: done (2026-11-06), see progress.md
 - `sim/planner_gen.py`: `Knobs`, `sample_knobs(rng)`, `solve_stack_cube`, `solve_pick_cube` exactly as §6.1
   (copy the official solutions' structure; grasp yaw fallback via `dry_run`; RRT fallback to screw; wrap in
   try/finally `planner.close()`).
@@ -131,13 +131,13 @@ Status legend: todo · in progress · blocked · done
 
 ## Workstream C: motion model & evaluation
 
-### C1 Geometry + trajectory core — deps S0.1 — Status: todo
+### C1 Geometry + trajectory core — deps S0.1 — owner: Aditya — Status: done (2026-11-06), see progress.md
 - `geometry.py` (§4 conventions: quats wxyz, 6D, pose7↔4×4, se3_inverse, transform_gaussians, SAPIEN→OpenCV camera,
   look-at, fov→K, project) and `trajectory.py` (Episode, resampling, motion tensor §6.3, known masks, decode).
 - Acceptance: unit tests: quat↔matrix↔6D round trips (1e-6), slerp endpoints, resampling preserves endpoints,
   `episode_to_motion`→`motion_to_episode` preserves L and endpoints, cube symmetry group has 24 elements.
 
-### C2 Kinematics wrapper — deps C1 — Status: todo
+### C2 Kinematics wrapper — deps C1 — owner: Amogh — Status: done (2026-11-11), ≤ 9.1e-7 m, see progress.md
 - `sim/kinematics.py`: `PandaFK(robot_uid)` (panda → panda_v2.urdf, panda_wristcam → panda_v3.urdf), link poses,
   TCP, hand camera viewmat; batch-flattening.
 - Acceptance: FK vs simulator link poses < 1e-5 m for 50 random configs (both robots).

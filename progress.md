@@ -12,16 +12,17 @@ Status: todo · in progress · done · blocked
 
 | Task | Owner | Status | What exists | Notes / numbers |
 |---|---|---|---|---|
-| S0.1 Repo scaffold [S1] | Shivam | todo | — | No `pyproject.toml` yet; code imports via `PYTHONPATH=src` (set in the CPU image) |
-| S0.2 Laptops [S1] | each | todo | — | Macs can't run the planner natively (see Findings); use the CPU image below |
+| S0.1 Repo scaffold [S1] | Amogh (Shivam's task) | done on Windows (2026-11-11); Linux = CI | `pyproject.toml`, `src/gaussbridge/__init__.py`, `tests/conftest.py`, `.gitattributes`, `.github/workflows/tests.yml`, README quick start | `pip install -e ".[dev]"` keeps the installed torch; see S0.1 below |
+| S0.2 Laptops [S1] | each | in progress | Amogh: Windows done for B work (2026-11-10), see "Windows setup" | Macs can't run the planner natively (see Findings); use the CPU image below. Windows can't run the planner either (no mplib) |
 | S0.3 Docker + CHTC [S2] | Aditya | in progress | `docker/Dockerfile.cpu` (CPU, lavapipe) | CUDA image (CLAUDE.md §3.4) and CHTC submit files still todo |
 | A1 Randomised planner | Aditya | done (2026-11-06) | `src/gaussbridge/sim/planner_gen.py`, `scripts/gen_demos.py`, `scripts/plot_refs.py`, `tests/test_planner_gen.py` | 80% / 100% success per attempt; see A1 below |
 | A2 Extraction to Episodes | Aditya | todo | — | needs C1 (Episode format) and C2 (FK for the gripper position) |
 | A3 Physics replay [A2] | Aditya | todo | — | |
 | A4–A7 | Aditya | todo | — | |
-| B1–B8 | Amogh | todo | — | |
+| B1 Capture environments | Amogh | in progress (2026-11-11) | — | branch `amogh/c2-b1` |
+| B2–B8 | Amogh | todo | — | |
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
-| C2 Kinematics (PandaFK) [none] | Shivam | todo | — | needed by A2 and B1; no owner on the helper board |
+| C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
 | C3–C9 | Shivam | todo | — | |
 
 ## A1 — randomised planner demos
@@ -102,6 +103,60 @@ PickCube** (1/12 above it, success tolerance is 25 mm); consider 1 cm.
 
 **For the next tasks:** A2 can lift `_episode_from_shard` from `tests/test_sim_integration.py` (it is the extractor
 minus the attached rule); A3 can lift the replay loop from the same test.
+
+## S0.1 — repo scaffold
+
+* `pip install -e ".[dev]"` (extras: `gs` = gsplat + render metrics, `train` = hydra + wandb, `dev` = pytest/ruff).
+  Install torch first from the right index (CLAUDE.md §3); the pins match, so pip leaves it alone (checked with
+  `--dry-run` on the Windows CUDA env). No more `PYTHONPATH=src` needed (pytest also sets it).
+* `tests/conftest.py` skips `test_planner_gen.py` / `test_sim_integration.py` where mplib is missing (Windows, Mac),
+  instead of failing at import. Mark new tests `@pytest.mark.sim` (ManiSkill + Vulkan) or `gpu` (CUDA).
+* CI (`.github/workflows/tests.yml`): every PR and push to main runs `pytest` in `python:3.11-slim-trixie` with
+  lavapipe (same setup as `docker/Dockerfile.cpu`), so planner + sim tests run on Linux even when the author can't.
+* `.gitattributes`: text stored with LF, so `chtc/*.sh` never get Windows line endings.
+
+## C2 — Panda forward kinematics
+
+`PandaFK(robot_uid="panda_wristcam" | "panda", device, dtype)`: `link_poses(qpos, base_pose=None, links=None)` →
+`{link: T_world_link [..., 4, 4]}`, `tcp_pose(qpos)`, `hand_camera_viewmat(qpos)` (OpenCV world→camera, wristcam
+only). `qpos [..., 9]` in ManiSkill order, any batch dims, differentiable; `base_pose` = pose7 or 4×4, default
+`(-0.615, 0, 0)`. Reads ManiSkill's URDF without importing ManiSkill (no SAPIEN/Vulkan needed, e.g. in training jobs).
+
+**Acceptance** (`tests/test_kinematics.py`, 50 random configs within joint limits, all 15 links, float64):
+
+| Robot (task) | Max position error | Max rotation-matrix error | Hand-camera viewmat vs ManiSkill extrinsic |
+|---|---|---|---|
+| panda_wristcam (StackCube) | 8.6e-7 m | 1.3e-6 | 1.0e-6 |
+| panda (PickCube) | 9.1e-7 m | 1.3e-6 | — |
+
+Also tested: batch shapes `[2, 3, 9]`, base-pose shift, gradients w.r.t. joint angles. Speed: 26 ms for 4096
+configs (all links, CPU). **A2** can use `tcp_pose` for the attached rule; **B1/B5** use `hand_camera_viewmat`.
+
+## Windows setup (Amogh, 2026-11-10; RTX 4060 Laptop 8 GB, driver 616.56)
+
+Native Windows works for everything except the motion planner (mplib is Linux-only; ManiSkill skips it).
+```powershell
+conda create -n gaussbridge python=3.11 -y
+$py = "$env:USERPROFILE\anaconda3\envs\gaussbridge\python.exe"
+& $py -m pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu124   # PyPI torch is CPU-only on Windows
+& $py -m pip install mani_skill==3.0.1 "numpy<2" h5py gsplat==1.5.3 ninja jaxtyping rich hydra-core wandb lpips torchmetrics trimesh transforms3d pytest matplotlib
+& $py -m pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu124  # lpips pulls a new CPU torch; re-pin
+# gsplat from source (needs MSVC 2022 + CUDA 12.4 nvcc; run inside a vcvars64 shell, CUDA_HOME set,
+# CUDA's lib dir on LIB, TORCH_CUDA_ARCH_LIST=8.9 for an RTX 40xx):
+& $py -m pip install --no-build-isolation --no-deps --force-reinstall "git+https://github.com/nerfstudio-project/gsplat.git@v1.5.3"
+```
+* **Use `render_backend="sapien_cpu"` on Windows.** The default GPU backend (`sapien_cuda`) crashes with an access
+  violation in `get_picture_cuda`. `sapien_cpu` still renders on the NVIDIA GPU through Vulkan (6 ms per `get_obs`
+  for both StackCube cameras), just with a CPU readback.
+* **The gsplat 1.5.3 PyPI wheel cannot JIT-compile on Windows:** `gsplat/cuda/_backend.py` passes the GCC flag
+  `-Wno-attributes` to MSVC (`cl : D8021 invalid numeric argument`). Build from source instead (above); `setup.py`
+  handles Windows flags. After that there is no compile at import time.
+* Verified on this machine: StackCube rgb+depth+seg renders, `segmentation_id_map` ids match CLAUDE.md §5,
+  re-render after `set_qpos` works; `test_geometry.py` + `test_trajectory.py` pass (4/4); camera-helper check of
+  `test_sim_integration.py` passes (run standalone, since that file imports the planner); pytorch_kinematics FK vs
+  sim link positions 3.6e-7 m (panda_v3); gsplat `rasterization` with 20 colour channels, `RGB+ED`, `packed=False`
+  → render `[1,128,128,21]`, `radii [C,N,2]`, meta has `means2d`, `gaussian_ids`, `width`, `height`, `n_cameras`;
+  backward works; 1.3 ms per 128² frame (1k Gaussians).
 
 ## Findings that affect everyone
 
