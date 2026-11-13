@@ -153,7 +153,7 @@ Status legend: todo · in progress · blocked · done
 - Acceptance: StackCube v1 model trained 150k steps; val loss curve; 16 sampled trajectories visualised (matplotlib
   3D TCP/object tracks + one Gaussian-rendered video once B5 exists).
 
-### C5 Metrics + evaluation harness — deps C1 — Status: todo
+### C5 Metrics + evaluation harness — deps C1 — owner: Shivam — Status: in progress (sanity passed on dev data; penetration after C6, replay after A3)
 - `eval/metrics.py` (§10.1), `scripts/eval_motion.py` (test split, both goal modes, S = 32), JSON + markdown table output.
 - Acceptance: metrics on planner references vs themselves (sanity: coverage 1.0) and on the straight-line baseline.
 

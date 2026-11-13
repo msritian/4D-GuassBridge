@@ -26,7 +26,8 @@ Status: todo · in progress · done · blocked
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
 | C3 Dataset + model | Shivam | in progress (2026-11-13): code done, overfit passed, memory check pending | `src/gaussbridge/model/{dataset,encoders,dit,flow,evaluate}.py`, `scripts/overfit_motion.py`, `scripts/check_memory.py`, `chtc/{overfit,check_memory}.{sub,sh}`, `tests/test_motion_*.py` | overfit on 10 real episodes: 6 mm / 0.9° / 0.026 rad to the nearest episode, endpoints exact; see C3 below |
-| C4–C9 | Shivam | todo | — | |
+| C5 Metrics + harness | Shivam | in progress (2026-11-13): metrics, straight line, harness done; sanity passed | `src/gaussbridge/eval/{metrics,baselines}.py`, `scripts/eval_motion.py`, `tests/test_eval_metrics.py`, `results/c5/` | refs vs themselves: coverage 1, precision 1, minADE 0; penetration waits for C6 spheres, replay for A3; see C5 below |
+| C4, C6–C9 | Shivam | todo | — | |
 
 ## A1 — randomised planner demos
 
@@ -146,6 +147,30 @@ recipe (constant lr, no EMA); C4 candidates: lr decay + EMA, and rescaling joint
 
 **CHTC lessons** (CLAUDE.md §3.5): Blackwell GPUs fail with torch 2.5.1 → request capability 8.0–9.0; job scripts
 always return logs; one folder per job type under `~/gaussbridge/`.
+
+## C5 — metrics + evaluation harness (Shivam)
+
+* `eval/metrics.py`: tracks = TCP (FK) + object centres on the 128-step grid; `ade`, `min_ade`, `coverage`, `precision`
+  (@3 cm), `apd`, `mean_squared_jerk` (float64), `endpoint_errors` (object cm, object rotation with the 24 cube
+  symmetries, TCP cm). Not yet: penetration (needs C6 sphere proxies), physics replay (needs A3).
+* `eval/baselines.py`: `straight_line` (§8.4) in grid form; with an unknown robot end the robot stays at its start.
+* `scripts/eval_motion.py --episodes <dir> --out results/c5/<name>`: cases = start seeds, goal modes objects + full
+  (conditioning = reference 0), methods `refs` (sanity) and `straight`; a model plugs in as one more method.
+* Tests (`tests/test_eval_metrics.py`, 8): hand-made tracks with known answers, jerk of t³ = 36, cube symmetry, TCP
+  track = FK, baseline masks/half-way/valid rotations, harness sanity; each checked against a planted bug.
+
+**Dev data (3 seeds × 4 refs per task, `results/c5/*_dev.md`), goal = objects:**
+| task | method | end obj (cm) | end TCP (cm) | minADE (cm) | coverage@3cm | precision@3cm | APD (cm) | jerk (m²/s⁶) |
+|---|---|---|---|---|---|---|---|---|
+| StackCube | refs | 0.23 | 0.54 | 0.00 | 1.00 | 1.00 | 1.74 | 3.34 |
+| StackCube | straight | 0.00 | 14.05 | 5.27 | 0.00 | 0.00 | 0.00 | 0.00 |
+| PickCube | refs | 0.30 | 0.31 | 0.00 | 1.00 | 1.00 | 2.92 | 3.78 |
+| PickCube | straight | 0.00 | 12.05 | 7.14 | 0.00 | 0.00 | 0.00 | 0.00 |
+
+**Open question for C8 (threshold):** references from one start differ by only 1.7–2.9 cm ADE on average, below
+the 3 cm coverage threshold of §10.1, so one sample can "cover" several references; with the full goal even the
+straight line reaches coverage 0.17–0.33. Proposal: also report coverage/precision at 1 cm (and decide in C8).
+Jerk alone does not separate the straight line (0) from real motion; coverage and precision do.
 
 ## A2 — extraction to Episodes
 

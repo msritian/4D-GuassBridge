@@ -597,6 +597,9 @@ reference's full end (full goal). Draw S = 32 samples after filtering. Report me
 | Rejection rate | % candidates removed by projection/filters |
 | Speed | samples/s on one GPU |
 ADE = mean over steps and tracked points (TCP + objects) of Euclidean distance, on the 128-step grid.
+**Measured 2026-11-13 (C5, dev data):** references of one start differ by only 1.7–2.9 cm ADE, below the 3 cm
+threshold, so coverage@3 cm is lenient (the straight line gets 0.17–0.33 with the full goal). Also report @1 cm;
+decide the headline threshold in C8.
 
 ### 10.2 Rendering quality
 PSNR/SSIM/LPIPS vs ManiSkill renders (policy cameras) for: asset mode, scene mode (start+end only), scene mode +
