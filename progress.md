@@ -14,7 +14,7 @@ Status: todo · in progress · done · blocked
 |---|---|---|---|---|
 | S0.1 Repo scaffold [S1] | Amogh (Shivam's task) | done on Windows (2026-11-11); Linux = CI | `pyproject.toml`, `src/gaussbridge/__init__.py`, `tests/conftest.py`, `.gitattributes`, `.github/workflows/tests.yml`, README quick start | `pip install -e ".[dev]"` keeps the installed torch; see S0.1 below |
 | S0.2 Laptops [S1] | each | in progress | Amogh: Windows done for B work (2026-11-10), see "Windows setup" | Macs can't run the planner natively (see Findings); use the CPU image below. Windows can't run the planner either (no mplib) |
-| S0.3 Docker + CHTC [S2] | Aditya | in progress | `docker/Dockerfile.cpu` (CPU, lavapipe) | CPU job files in progress (draft PR); CUDA image (CLAUDE.md §3.4) still todo |
+| S0.3 Docker + CHTC [S2] | Aditya | in progress | `docker/Dockerfile.cpu`, `chtc/` (run.sh, gen_shard.sh, gen_demos.sub + list, interactive.sub) | CPU jobs done and simulated locally; image push + first CHTC run (Aditya's accounts) and the CUDA image still todo; see S0.3 below |
 | A1 Randomised planner | Aditya | done (2026-11-06) | `src/gaussbridge/sim/planner_gen.py`, `scripts/gen_demos.py`, `scripts/plot_refs.py`, `tests/test_planner_gen.py` | 80% / 100% success per attempt; see A1 below |
 | A2 Extraction to Episodes | Aditya | done (2026-11-12) | `src/gaussbridge/sim/extract.py`, `scripts/extract_episodes.py`, `tests/test_extract.py` | 24/24 dev demos: one grasp interval, finger 18.3 mm; see A2 below |
 | A3 Physics replay [A2] | Aditya | todo | — | |
@@ -127,6 +127,42 @@ holds at the end, knobs sidecar matched by episode id. `test_sim_integration.py`
 | PickCube-v1 | 12/12 | 18.3–20.5 mm, median 18.3 | ≤ 4.4 mm | yes |
 The first held step reads ≈ 20.5 mm (fingers still closing), then 18.3 mm. CLAUDE.md §5 said "1–3 mm" to the TCP;
 updated to ≤ 5 mm.
+
+## S0.3 — CHTC CPU jobs (planner data for A4)
+
+* `chtc/run.sh` (any job): unpacks `code.tar` (made with `git archive`, so `$GIT_COMMIT` = the exact commit, written
+  into every Episode's meta), sets `PYTHONPATH`, `HOME` = scratch dir and lavapipe, runs the command, packs `./out`.
+* `chtc/gen_shard.sh <task> <split> <seed_start> <num_seeds> <refs>`: A1 generation + A2 extraction for one shard.
+* `chtc/gen_demos.sub` + `chtc/gen_demos.txt`: 60 jobs = every split of CLAUDE.md §6.1 for both tasks (50 seeds per
+  job, 24,200 demos: StackCube 14,100, PickCube 10,100). Each returns `shards/<task>_<split>_<seed_start>.tar`
+  (raw shard + Episodes, ~30 MB) to the submit directory, so no `/staging` is needed for generation.
+  `chtc/smoke.txt` = one 2-seed shard for a first test. `chtc/interactive.sub` = debugging session in the image.
+* **Simulated locally** (CPU image, empty scratch dir, non-root user): 2 seeds × 2 refs → 4 demos, 4 Episodes in
+  `out.tar`, 13 s under emulation; commit id read from a `git archive` tarball and stored in Episode meta.
+
+**To run on CHTC (anyone on the team with a CHTC HTC account):**
+1. **Image, once for the team** (whoever has Docker; on a Mac add `--platform linux/amd64` to the build). The Docker
+   Hub repo must be **public** so CHTC can pull it without a login:
+   ```bash
+   docker build --platform linux/amd64 -f docker/Dockerfile.cpu -t <dockerhub_user>/gaussbridge-cpu:0.2 .
+   docker push <dockerhub_user>/gaussbridge-cpu:0.2
+   ```
+2. **On a CHTC HTC submit node, in /home** (the submitter's own account):
+   ```bash
+   git clone https://github.com/msritian/4D-GuassBridge.git && cd 4D-GuassBridge
+   sed -i 's/CHANGE_ME/<dockerhub_user>/' chtc/*.sub
+   git archive -o chtc/code.tar HEAD && mkdir -p shards logs
+   ```
+3. **Smoke test:** change the last line of `chtc/gen_demos.sub` to `... from chtc/smoke.txt`, run
+   `condor_submit chtc/gen_demos.sub`, wait for `shards/StackCube-v1_smoke_0.tar` (`tar -tf` it: 4 `.npz` + a raw
+   shard). Note the run time in `logs/*.out`.
+4. **Full run:** change the line back to `chtc/gen_demos.txt` and submit again (60 jobs). Watch with `condor_q`.
+5. **Hand-off for A4:** the 60 tars (~1.7 GB) land in the submitter's `shards/`. Tell Aditya, then either copy them
+   to the group staging dir (once CHTC creates it) or share the folder path.
+
+Not verified (no CHTC access from here): the submit files themselves; `condor_submit` reports syntax errors at once,
+and the smoke test catches the rest. Still todo for S0.3: the CUDA image (CLAUDE.md §3.4) and GPU submit files, for
+A5 / B4 / C4.
 
 ## S0.1 — repo scaffold
 

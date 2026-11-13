@@ -1,0 +1,22 @@
+# Planner demos on CHTC CPU nodes (A4): one shard (≤ 50 start seeds, CLAUDE.md §6.1) per job.
+# Each job returns shards/<task>_<split>_<seed_start>.tar = raw ManiSkill shard + extracted Episodes (~30 MB).
+# On the submit node, in a clone of the repo:
+#   git archive -o chtc/code.tar HEAD && mkdir -p shards logs
+#   condor_submit chtc/gen_demos.sub
+# First run: change the last line to "... from chtc/smoke.txt" (one 2-seed shard) and check the result.
+universe              = container
+container_image       = docker://CHANGE_ME/gaussbridge-cpu:0.2
+executable            = chtc/run.sh
+arguments             = out.tar bash code/chtc/gen_shard.sh $(task) $(split) $(seed_start) $(num_seeds) $(refs)
+transfer_input_files  = chtc/code.tar
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_output_files = out.tar
+transfer_output_remaps = "out.tar = shards/$(task)_$(split)_$(seed_start).tar"
+request_cpus          = 1
+request_memory        = 4GB
+request_disk          = 4GB
+log                   = logs/gen_$(Cluster).log
+output                = logs/gen_$(Cluster)_$(Process).out
+error                 = logs/gen_$(Cluster)_$(Process).err
+queue task, split, seed_start, num_seeds, refs from chtc/gen_demos.txt
