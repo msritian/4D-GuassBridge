@@ -21,7 +21,8 @@ Status: todo · in progress · done · blocked
 | A4–A7 | Aditya | todo | — | |
 | B1 Capture environments | Amogh | done (2026-11-11) | `src/gaussbridge/sim/envs.py`, `src/gaussbridge/sim/capture.py`, `geometry.backproject`, `tests/test_capture.py`, `scripts/check_lighting.py`, `results/lighting/` | reprojection agreement 99.94–99.96%; lighting confirmed (21 dB cap); see B1 below |
 | B2 Asset-mode captures | Amogh | done (2026-11-11) | `sim/capture.py` (`random_configs`, `apply_config`, `capture_configs`, `view_valid`, save/load), `scripts/capture_assets.py`, `tests/test_configs.py`, `results/b2/` | every visual robot link in ≥ 67 training views (need 20); see B2 below |
-| B3–B8 | Amogh | todo | — | |
+| B3 PartSplats + composition | Amogh | done (2026-11-12) | `src/gaussbridge/gs/{splats,raster,render}.py`, `geometry.viewmat_to_campos`, `tests/test_splats.py`, `scripts/check_splats_capture.py`, `results/b3/` | dense rasteriser vs gsplat 2.3e-6; part+camera rotation invariance 2e-5; lit colour model built; see B3 below |
+| B4–B8 | Amogh | todo | — | |
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
 | C3–C9 | Shivam | todo | — | |
@@ -181,6 +182,50 @@ Runs anywhere ManiSkill renders (laptop, CHTC CPU job with lavapipe, GPU job); o
 Tests: `tests/test_configs.py` (limits, link heights, clearances, resting/floating, determinism, `view_valid`);
 `tests/test_capture.py::test_capture_configs_apply_reproject_and_roundtrip` (applied poses equal config + FK,
 reprojection between two different configurations > 99.5%, save/load round trip). Full suite: 19 passed.
+
+## B3 — PartSplats + composition
+
+```bash
+pytest -q tests/test_splats.py                       # 13 tests; the 2 gsplat comparisons need CUDA (marked gpu)
+python scripts/check_splats_capture.py --captures data/assets/StackCube-v1/captures.pt --out results/b3
+```
+* `gs/splats.py` — `PartSplats` (an `nn.Module`): gsplat-style pre-activation params in `splats.params`
+  (a `ParameterDict` that `DefaultStrategy` can densify directly; `part_id` is a non-trainable Parameter),
+  `world(part_T [P,4,4])` (composition, differentiable in `part_T` for pose refinement), `colors(world, campos)`,
+  `part_onehot(groups=None)`, `shape_points(name, n=512)` (shape-token input, §6.4), `subset`, `merge`, `save`/`load`,
+  `part_T_from_dict`. `init_from_points(points, rgb, part_id, names, kinds, color_mode=..., part_T=...)` (§7.2 init,
+  works on GPU). Two colour models: `"sh"` (§7.3 part-frame SH) and `"lit"` (world-lit albedo + normal + SH residual,
+  matching SAPIEN's `minimal` shader; formula in CLAUDE.md §7.3).
+* `gs/raster.py` — `rasterize(...)` → colours [C,H,W,D], expected depth, alpha, meta. `backend="gsplat"` (CUDA,
+  `RGB+ED`, `packed=False`) or `"dense"`: a differentiable PyTorch copy of gsplat's classic kernels (Jacobian clamp,
+  eps2d 0.3, 1/255 alpha threshold, exclusive 1e-4 transmittance stop, pixel centres at +0.5) for CPU tests.
+* `gs/render.py` — `render(splats, part_T, viewmats, Ks, W, H, background, features)` (B5 extends it).
+* **Fix in `geometry.matrix_to_quat`:** its backward was NaN at the identity rotation (`sqrt(0)`), which would have
+  broken pose refinement and any gradient through part poses. Now takes the root only of positive entries (as
+  pytorch3d); forward values unchanged, new test `test_matrix_to_quat_has_finite_gradients_at_identity`.
+
+**Acceptance** (RTX 4060 laptop, gsplat 1.5.3 built from source):
+| Check (TASKS.md B3) | Result |
+|---|---|
+| (1) identity poses vs plain gsplat with its own SH evaluation (degree 2, 300 Gaussians, 2 cameras) | max abs 2.7e-7 (rgb), 2.4e-7 (alpha) |
+| (2) rotate part and camera together about the part origin, `"sh"` mode (dense, CPU) | identical to 2e-5 (rgb, alpha, depth) |
+| (3) dense rasteriser vs gsplat, random 2-part scene, 3 cameras, background + 2 label channels | max abs 1.5e-6 rgb, 2.3e-6 labels/alpha, 1.8e-7 m depth (target 1e-3) |
+Also tested: covariances transform as R Σ Rᵀ; `"lit"` matches the SAPIEN diffuse formula for one Gaussian and changes
+under a part+camera rotation unless the lights rotate too; lit albedo init round trip; `part_id`, albedo and normals
+survive gsplat's `duplicate`/`split`/`remove`; subset/merge/save/load. Full suite: 34 passed.
+
+**Real-capture check** (`results/b3/<task>.splats_check.{json,png}`): back-project StackCube configuration 0
+(all valid cameras, ≤ 20k points per part, opacity 0.9, no optimisation), pose with the **held-out** configurations'
+part poses, render the policy cameras:
+| View | Mask IoU | Part-label accuracy | PSNR (raw init) |
+|---|---|---|---|
+| base_camera, held-out cfg 8 / 9 | 0.772 / 0.774 (0.9998 without far ground) | 0.944 / 0.928 | 12.7 / 12.5 dB |
+| hand_camera, held-out cfg 8 / 9 | 0.968 / 1.000 | 0.896 / 0.910 | 17.5 / 18.8 dB |
+PickCube: same numbers within 0.01. Frames, FK-driven composition and the renderer agree with ManiSkill on real data.
+Two findings for B4: (a) the far floor (> 3 m, dropped by §7.2's init rule) is 22–25% of every base_camera frame and
+must be modelled; (b) blurry init Gaussians of `panda_hand` (sized for the far rings) bleed into the bottom of the
+hand camera from ~3 cm away; label errors there are almost all `panda_hand`, which training on hand-camera views
+should fix.
 
 ## Windows setup (Amogh, 2026-11-10; RTX 4060 Laptop 8 GB, driver 616.56)
 

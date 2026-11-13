@@ -411,7 +411,10 @@ table-workspace, ground, objects; PickCube's hidden `goal_site` excluded). Optim
 for each sampled training view, pose all parts with that configuration's `part_T`, render, compute loss.
 * **Init:** back-project valid depth pixels of each part into its canonical frame (`x_can = T_part⁻¹ x_world`),
   subsample ≤ 20k points per part, colour from RGB, scale = mean 3-NN distance (clamp 0.1 mm–5 cm), opacity 0.1.
-  Ignore ground pixels farther than 3 m.
+  Ignore ground pixels farther than 3 m. **Measured (B3, 2026-11-12):** that far floor is 22–25% of every
+  `base_camera` frame (the floor reaches the horizon), so a reconstruction without it can only reach IoU ≈ 0.78 there
+  (≈ 1.0 on everything else). B4 must model it: keep far ground with a larger cutoff and depth-scaled Gaussians, or
+  a learned backdrop.
 * **Loss:** 0.8·L1 + 0.2·(1−SSIM) + 0.1·|depth − D_gt| (valid pixels) + 0.05·CE(part label) where part labels are
   rendered as one-hot feature channels normalised by alpha (keeps each part's Gaussians on its own pixels).
   Learnable background colour (sigmoid of a 3-vector).
@@ -460,9 +463,16 @@ lights surfaces with world-fixed lights (ambient 0.3, directional `[1,1,-1]` and
 `BaseEnv._load_lighting`), then gamma 1/2.2 and clamp. Rotating a part and the camera together (identical part-frame
 geometry and view, mask IoU 1.0) still changes its pixels: cube up to 12/255 mean abs (21 dB on cube pixels, a side
 face's red channel 147↔196), arm via joint 1 up to 16/255 (≈ 30 dB within ±60°, 21.5 dB at 150°). A part-frame
-colour model cannot represent this, and cube yaw is random every episode. **Planned (B3/B4, owner Amogh):**
-per-Gaussian albedo + part-frame normal, colour = `clamp((albedo·(ambient + Σᵢ eᵢ·max(0, (R_p n)·lᵢ)) + SH
-residual)^(1/2.2))` with the known light directions and learnable intensities; normals initialised from depth.
+colour model cannot represent this, and cube yaw is random every episode. **As built (B3, 2026-11-12,
+`gs/splats.py`, `PartSplats(color_mode="lit")`):** per-Gaussian albedo (`params["albedo"]`, sigmoid, linear) and
+part-frame normal (`params["normals"]`), colour = `clamp(lin^(1/2.2), 0, 1)` with
+`lin = albedo·(ambient + Σᵢ eᵢ·max(0, (R_p n)·lᵢ)) + SH_res(d_local)`. This is exactly the diffuse part of SAPIEN's
+`minimal` shader (`vulkan_shader/minimal/gbuffer.frag`: `ambient·albedo + Σ albedo·e·max(0, n·l)/π`, then pow and
+clamp), so `eᵢ` starts at 1/π and ambient at 0.3 (both learnable, `splats.lights`); `lᵢ = −dir` with ManiSkill's
+directions. The shader's GGX specular and environment terms are left to the part-frame SH residual (init 0).
+`color_mode="sh"` is the original part-frame SH model above. `init_from_points(..., color_mode="lit", part_T=...)`
+sets albedo = linear(rgb) / shading at the pose the colours were seen in (clip [0.001, 0.999]); normals are given
+(e.g. from depth, pointing at the camera side) or PCA-estimated (oriented away from the part centroid).
 ManiSkill's `default` shader pack can render `normal` and `albedo` textures for supervision.
 Outputs per frame and camera:
 * RGB (clamp to [0,1] only when saving), expected depth, alpha;
@@ -616,7 +626,7 @@ gaussbridge/
     gs/splats.py         PartSplats (compose, local-frame SH colours, save/load/subset/merge), init_from_points
     gs/recon.py          articulated multi-config reconstruction (+ pose refinement)
     gs/render.py         render (rgb, depth, alpha, labels, scene flow), optical_flow, tracks
-    gs/raster.py         gsplat on CUDA; tiny dense PyTorch rasteriser for CPU unit tests
+    gs/raster.py         gsplat on CUDA; dense PyTorch rasteriser for CPU tests (matches gsplat to ~2e-6)
     model/encoders.py    PointSetEncoder, HeightMapEncoder
     model/dit.py         MotionDiT
     model/flow.py        flow_loss, sample (inpainting + guidance)
