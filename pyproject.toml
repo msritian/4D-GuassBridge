@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gaussbridge"
+version = "0.1.0"
+description = "Gaussian world models for diverse start-to-goal 4D trajectory generation (CS771 project)"
+requires-python = ">=3.11,<3.13"
+# Install torch first from the right index (CUDA 12.4 on GPU machines/Windows, CPU wheels in Dockerfile.cpu),
+# see CLAUDE.md §3. These pins match an environment set up that way, so `pip install -e .` does not replace torch.
+dependencies = [
+    "torch==2.5.1",
+    "numpy<2",
+    "h5py",
+    "mani_skill==3.0.1",
+]
+
+[project.optional-dependencies]
+# gsplat needs a CUDA toolkit; on Windows build it from source (progress.md "Windows setup").
+gs = ["gsplat==1.5.3", "ninja", "jaxtyping", "rich", "lpips", "torchmetrics"]
+train = ["hydra-core", "wandb"]
+dev = ["pytest", "ruff", "matplotlib"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "sim: needs ManiSkill and a Vulkan device (lavapipe works)",
+    "gpu: needs a CUDA GPU",
+]
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests", "scripts"]

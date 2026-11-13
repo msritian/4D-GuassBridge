@@ -1,0 +1,11 @@
+# Store text with LF so scripts run on CHTC/Linux no matter who commits (Windows checkouts may still show CRLF).
+* text=auto eol=lf
+*.bat text eol=crlf
+*.pdf binary
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.h5 binary
+*.npz binary
+*.npy binary
+*.pt binary

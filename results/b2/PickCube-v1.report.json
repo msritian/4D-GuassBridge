@@ -1,0 +1,118 @@
+{
+ "meta": {
+  "task": "PickCube-v1",
+  "env_id": "PickCubeCapture-v1",
+  "robot_uid": "panda",
+  "seed": 0,
+  "n_train": 8,
+  "n_heldout": 2,
+  "git": "56350599671b514a4c9f7731440868576b43b21b-dirty",
+  "created": "2026-11-11T22:08:02",
+  "rings": [
+   {
+    "name": "wide",
+    "target": [
+     -0.15,
+     0.0,
+     0.15
+    ],
+    "radius": 1.1,
+    "elevations_deg": [
+     20,
+     45,
+     70
+    ],
+    "n_azimuth": 12,
+    "size": 256,
+    "fovy_deg": 60.0
+   },
+   {
+    "name": "close",
+    "target": [
+     -0.05,
+     0.0,
+     0.08
+    ],
+    "radius": 0.5,
+    "elevations_deg": [
+     30,
+     60
+    ],
+    "n_azimuth": 8,
+    "size": 256,
+    "fovy_deg": 60.0
+   }
+  ]
+ },
+ "file_mb": 196.1,
+ "capture_seconds": 2.99,
+ "n_cameras": 53,
+ "views_per_part_train": {
+  "panda_link0": 330,
+  "panda_link1": 313,
+  "panda_link2": 298,
+  "panda_link3": 261,
+  "panda_link4": 273,
+  "panda_link5": 295,
+  "panda_link6": 291,
+  "panda_link7": 271,
+  "panda_link8": 0,
+  "panda_hand": 301,
+  "panda_hand_tcp": 0,
+  "panda_leftfinger": 67,
+  "panda_leftfinger_pad": 0,
+  "panda_rightfinger": 69,
+  "panda_rightfinger_pad": 0,
+  "table-workspace": 422,
+  "ground": 395,
+  "cube": 381
+ },
+ "worst_visual_robot_link": [
+  "panda_leftfinger",
+  67
+ ],
+ "acceptance_min_views": 20,
+ "acceptance_pass": true,
+ "floating": [
+  [
+   false
+  ],
+  [
+   true
+  ],
+  [
+   true
+  ],
+  [
+   true
+  ],
+  [
+   false
+  ],
+  [
+   true
+  ],
+  [
+   false
+  ],
+  [
+   true
+  ],
+  [
+   false
+  ],
+  [
+   true
+  ]
+ ],
+ "invalid_views": [
+  [
+   "close_e60_a02",
+   5
+  ],
+  [
+   "close_e60_a03",
+   3
+  ]
+ ]
+}

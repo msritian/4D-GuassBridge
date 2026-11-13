@@ -145,3 +145,13 @@ def project(points, viewmat, K):
     pc = points @ viewmat[..., :3, :3].transpose(-1, -2) + viewmat[..., None, :3, 3]
     uvw = pc @ K.transpose(-1, -2)
     return uvw[..., :2] / uvw[..., 2:3], pc[..., 2]
+
+
+def backproject(depth, viewmat, K, rows, cols):
+    """Pixels (rows, cols) [N] of a z-depth image [H, W] (metres, camera z as ManiSkill) -> world points [N, 3].
+    Uses pixel centres (col + 0.5, row + 0.5), the inverse of project() + floor()."""
+    z = depth[rows, cols]
+    uv1 = torch.stack([cols + 0.5, rows + 0.5, torch.ones_like(z)], -1).to(K.dtype)
+    pc = (uv1 @ torch.linalg.inv(K).T) * z[:, None]
+    R, t = viewmat[:3, :3], viewmat[:3, 3]
+    return (pc - t) @ R  # camera -> world: R^T (pc - t)

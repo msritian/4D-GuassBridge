@@ -1,0 +1,137 @@
+{
+ "meta": {
+  "task": "StackCube-v1",
+  "env_id": "StackCubeCapture-v1",
+  "robot_uid": "panda_wristcam",
+  "seed": 0,
+  "n_train": 8,
+  "n_heldout": 2,
+  "git": "56350599671b514a4c9f7731440868576b43b21b-dirty",
+  "created": "2026-11-11T22:09:45",
+  "rings": [
+   {
+    "name": "wide",
+    "target": [
+     -0.15,
+     0.0,
+     0.15
+    ],
+    "radius": 1.1,
+    "elevations_deg": [
+     20,
+     45,
+     70
+    ],
+    "n_azimuth": 12,
+    "size": 256,
+    "fovy_deg": 60.0
+   },
+   {
+    "name": "close",
+    "target": [
+     -0.05,
+     0.0,
+     0.08
+    ],
+    "radius": 0.5,
+    "elevations_deg": [
+     30,
+     60
+    ],
+    "n_azimuth": 8,
+    "size": 256,
+    "fovy_deg": 60.0
+   }
+  ]
+ },
+ "file_mb": 197.0,
+ "capture_seconds": 2.74,
+ "n_cameras": 54,
+ "views_per_part_train": {
+  "panda_link0": 334,
+  "panda_link1": 314,
+  "panda_link2": 304,
+  "panda_link3": 288,
+  "panda_link4": 290,
+  "panda_link5": 338,
+  "panda_link6": 336,
+  "panda_link7": 286,
+  "panda_link8": 0,
+  "panda_hand": 321,
+  "panda_hand_tcp": 0,
+  "panda_leftfinger": 71,
+  "panda_rightfinger": 91,
+  "camera_base_link": 0,
+  "camera_link": 156,
+  "table-workspace": 428,
+  "ground": 398,
+  "cubeA": 353,
+  "cubeB": 364
+ },
+ "worst_visual_robot_link": [
+  "panda_leftfinger",
+  71
+ ],
+ "acceptance_min_views": 20,
+ "acceptance_pass": true,
+ "floating": [
+  [
+   false,
+   false
+  ],
+  [
+   false,
+   false
+  ],
+  [
+   true,
+   true
+  ],
+  [
+   true,
+   false
+  ],
+  [
+   true,
+   true
+  ],
+  [
+   false,
+   true
+  ],
+  [
+   false,
+   true
+  ],
+  [
+   true,
+   false
+  ],
+  [
+   false,
+   true
+  ],
+  [
+   true,
+   false
+  ]
+ ],
+ "invalid_views": [
+  [
+   "close_e60_a03",
+   2
+  ],
+  [
+   "close_e60_a05",
+   3
+  ],
+  [
+   "close_e60_a06",
+   3
+  ],
+  [
+   "close_e60_a06",
+   6
+  ]
+ ]
+}
