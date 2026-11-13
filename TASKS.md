@@ -49,7 +49,7 @@ Status legend: todo · in progress · blocked · done
 - Acceptance: unit test on a generated shard: `attached` is True on a single contiguous interval per moved object,
   finger ≈ 0.018 m inside it, cubeB never attached (StackCube).
 
-### A3 Physics replay tool — deps A2 — Status: todo
+### A3 Physics replay tool — deps A2 — owner: Aditya — Status: in progress (2026-11-12)
 - `sim/replay.py`: reset with seed (or `set_state_dict`), execute `actions_pd_joint_pos` + 10 hold steps, return
   success and per-object end error.
 - Acceptance (regression test, already verified once): planner episode → `episode_to_motion` (N=128) →
