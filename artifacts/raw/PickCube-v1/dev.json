@@ -1,0 +1,149 @@
+{
+  "env_info": {
+    "env_id": "PickCube-v1",
+    "env_kwargs": {
+      "obs_mode": "none",
+      "control_mode": "pd_joint_pos",
+      "sim_backend": "physx_cpu",
+      "render_backend": "sapien_cpu"
+    },
+    "max_episode_steps": 1000
+  },
+  "commit_info": null,
+  "episodes": [
+    {
+      "episode_id": 0,
+      "episode_seed": 0,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 170,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 0
+      },
+      "success": true
+    },
+    {
+      "episode_id": 1,
+      "episode_seed": 0,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 141,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 0
+      },
+      "success": true
+    },
+    {
+      "episode_id": 2,
+      "episode_seed": 0,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 164,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 0
+      },
+      "success": true
+    },
+    {
+      "episode_id": 3,
+      "episode_seed": 0,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 149,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 0
+      },
+      "success": true
+    },
+    {
+      "episode_id": 4,
+      "episode_seed": 1,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 113,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 1
+      },
+      "success": true
+    },
+    {
+      "episode_id": 5,
+      "episode_seed": 1,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 152,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 1
+      },
+      "success": true
+    },
+    {
+      "episode_id": 6,
+      "episode_seed": 1,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 169,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 1
+      },
+      "success": true
+    },
+    {
+      "episode_id": 7,
+      "episode_seed": 1,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 128,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 1
+      },
+      "success": true
+    },
+    {
+      "episode_id": 8,
+      "episode_seed": 2,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 179,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 2
+      },
+      "success": true
+    },
+    {
+      "episode_id": 9,
+      "episode_seed": 2,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 174,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 2
+      },
+      "success": true
+    },
+    {
+      "episode_id": 10,
+      "episode_seed": 2,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 213,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 2
+      },
+      "success": true
+    },
+    {
+      "episode_id": 11,
+      "episode_seed": 2,
+      "control_mode": "pd_joint_pos",
+      "elapsed_steps": 126,
+      "reset_kwargs": {
+        "options": null,
+        "seed": 2
+      },
+      "success": true
+    }
+  ],
+  "source_type": "motionplanning",
+  "source_desc": "GaussBridge randomised planner (A1)"
+}
