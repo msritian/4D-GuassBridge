@@ -13,7 +13,9 @@ when_to_transfer_output = ON_EXIT
 request_gpus            = 1
 +WantGPULab             = true
 +GPUJobLength           = "short"
-gpus_minimum_memory     = 40G
+# 24 GB, not 40: 40 GB-class supported GPUs were scarce (job 8540436 waited > 1 h with 1 matching slot). Peak
+# memory is the same on any card; an out-of-memory run is recorded as {"oom": true} in memory.json.
+gpus_minimum_memory     = 24G
 # torch 2.5.1 has no Blackwell (capability 12.x) kernels, see chtc/overfit.sub
 gpus_minimum_capability = 8.0
 gpus_maximum_capability = 9.0

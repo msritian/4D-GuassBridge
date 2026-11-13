@@ -54,6 +54,20 @@ def measure(model, batch_size, device, bf16, steps):
             "sec_per_step": round(sum(times[1:]) / max(1, len(times) - 1), 4), "loss": round(loss.item(), 4)}
 
 
+def safe_measure(model, batch_size, device, bf16, steps):
+    """measure(), but a run that does not fit this GPU is recorded as {"oom": True} instead of crashing the job
+    (the job may land on a smaller card than the 40 GB budget; peak memory itself does not depend on the card)."""
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    try:
+        return measure(model, batch_size, device, bf16, steps)
+    except torch.cuda.OutOfMemoryError:
+        model.zero_grad(set_to_none=True)
+        torch.cuda.empty_cache()
+        return {"bf16": bf16, "batch": batch_size, "oom": True,
+                "note": "does not fit this GPU (see gpu_total_gb); rerun on a 40 GB card for the budget check"}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--out", default="memory.json")
@@ -68,13 +82,12 @@ def main():
         info["gpu_total_gb"] = round(torch.cuda.get_device_properties(0).total_memory / 2**30, 1)
     model = MotionDiT(**SIZES[args.size]).to(device)
     info["parameters_m"] = round(sum(p.numel() for p in model.parameters()) / 1e6, 2)
-    runs = [measure(model, args.batch, device, bf16=True, steps=args.steps)]
+    runs = [safe_measure(model, args.batch, device, True, args.steps)]
     if not args.skip_fp32:
-        if device == "cuda":
-            torch.cuda.empty_cache()
-        runs.append(measure(model, args.batch, device, bf16=False, steps=args.steps))
+        runs.append(safe_measure(model, args.batch, device, False, args.steps))
+    bf16 = runs[0]
     report = {**info, "budget_gb": BUDGET_GB, "runs": runs,
-              "fits_budget_bf16": runs[0]["peak_gb"] < BUDGET_GB if device == "cuda" else None}
+              "fits_budget_bf16": None if device != "cuda" or bf16.get("oom") else bf16["peak_gb"] < BUDGET_GB}
     with open(args.out, "w") as f:
         json.dump(report, f, indent=1)
     print(json.dumps(report, indent=1), flush=True)
