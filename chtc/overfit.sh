@@ -12,7 +12,10 @@ tar -xf episodes_dev.tar                       # -> dev/*.npz
 export PYTHONPATH="$PWD/code/src"
 python -c "import torch, numpy; print('torch', torch.__version__, 'numpy', numpy.__version__, 'cuda', torch.cuda.is_available())"
 
-python code/scripts/overfit_motion.py --episodes dev --out overfit_out "$@"
-
-tar -czf overfit_out.tar.gz overfit_out
-echo "end $(date)"
+# Always pack and return whatever exists (logs of a crashed run are the most useful thing to get back);
+# the job still reports the script's exit code.
+status=0
+python code/scripts/overfit_motion.py --episodes dev --out overfit_out "$@" || status=$?
+mkdir -p overfit_out && tar -czf overfit_out.tar.gz overfit_out
+echo "end $(date)  exit $status"
+exit $status
