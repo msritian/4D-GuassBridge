@@ -13,6 +13,9 @@ when_to_transfer_output = ON_EXIT
 request_gpus            = 1
 +WantGPULab             = true
 +GPUJobLength           = "short"
+# Also run on research groups' idle GPUs (backfill); the job may be interrupted and restarted, fine for checks
+# under ~2 h. Without it, capability 8.0-9.0 GPUs were often all busy (1 matching slot, jobs idle > 1 h).
++is_resumable           = true
 # 24 GB, not 40: 40 GB-class supported GPUs were scarce (job 8540436 waited > 1 h with 1 matching slot). Peak
 # memory is the same on any card; an out-of-memory run is recorded as {"oom": true} in memory.json.
 gpus_minimum_memory     = 24G

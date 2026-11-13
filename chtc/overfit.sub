@@ -26,6 +26,9 @@ when_to_transfer_output = ON_EXIT
 request_gpus            = 1
 +WantGPULab             = true
 +GPUJobLength           = "short"
+# Also run on research groups' idle GPUs (backfill); the job may be interrupted and restarted, fine for checks
+# under ~2 h. Without it, capability 8.0-9.0 GPUs were often all busy (1 matching slot, jobs idle > 1 h).
++is_resumable           = true
 gpus_minimum_memory     = 16G
 # torch 2.5.1 (cu124) has kernels for sm_50..sm_90 only: Blackwell (RTX PRO 6000, GB10 = capability 12.x)
 # fails with "no kernel image is available" (job 8539255). 8.0-9.0 = A100, A30, A40, L40(S), H100, H200.
