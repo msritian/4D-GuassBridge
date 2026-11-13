@@ -389,8 +389,14 @@ Extraction: `robot_qpos = env_states/articulations/<uid>[:, 13:22]`, `base_pose 
 * **Shape tokens:** per object, P = 512 canonical-frame points `[xyz, rgb]` = centres + base colour of that object's
   Gaussians (opacity > 0.5). Before Gaussians exist, use analytic box-surface samples (half 0.02, red/green).
 * **Height map:** 64×64 over x,y ∈ [−0.4, 0.4] m of the **static** background (table) from background Gaussians or
-  sim; constant (flat) for v1 tasks, kept for generality.
-* Endpoint-noise augmentation on the *known copy* only: objects 5 mm / 2°, joints 0.01 rad.
+  sim; constant (flat) for v1 tasks, kept for generality. **Not built in v1 (decision 2026-11-12, Shivam):** a
+  constant input carries no information, so C3 has no height-map encoder; the context is a token list, so one can be
+  added for a task with obstacles.
+* Endpoint-noise augmentation on the *known copy* only: objects 5 mm / 2°, joints 0.01 rad. **As built
+  (`model/dataset.py`):** Gaussian standard deviations, position per axis, rotation about a random axis, the 7 arm
+  joints only (finger, gripper command and attached flag stay exact). Goal-mode dropout is drawn per sample as
+  none 0.1 / objects 0.3 / full 0.6. Duration μ, σ are computed from the training episodes (`duration_stats`) and
+  must be stored with the checkpoint.
 
 ---
 
@@ -497,7 +503,7 @@ On held-out configurations and on planner trajectories (where ManiSkill can rend
 * Tokens: one per (step n, entity e): 128 × 4 = 512, plus 1 duration token. Token embedding =
   `Linear(F)(x_τ) + Linear(F+1)([x_known·known, known]) + entity-slot embedding + sinusoidal(n)` + (objects) shape token.
 * Context (cross-attention): a learned null token, object shape tokens (PointNet: per-point MLP 6→128→256, concat
-  max & mean pool → MLP → d), height-map tokens (4 stride-2 convs → 4×4 = 16 tokens).
+  max & mean pool → MLP → d), height-map tokens (4 stride-2 convs → 4×4 = 16 tokens; not built in v1, see §6.4).
 * 8 blocks, d = 384, 6 heads, MLP ratio 4: self-attention over all motion tokens (+ padding mask for missing
   objects), cross-attention to context, MLP; flow time τ through **adaLN-Zero** (DiT). Output heads zero-initialised:
   per-token velocity [F] and duration velocity. ≈ 30 M parameters. (If attention cost matters: factorise into

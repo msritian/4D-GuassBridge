@@ -25,7 +25,8 @@ Status: todo · in progress · done · blocked
 | B4–B8 | Amogh | todo | — | |
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
-| C3–C9 | Shivam | todo | — | |
+| C3 Dataset + model | Shivam | in progress (2026-11-12) | branch `shivam/c3-motion-model` | plan: dataset → encoders → DiT → flow loss + sampler → overfit 10 episodes |
+| C4–C9 | Shivam | todo | — | |
 
 ## A1 — randomised planner demos
 
