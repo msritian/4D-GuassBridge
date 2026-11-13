@@ -95,30 +95,31 @@ def duration_stats(episodes):
 
 
 # ---------------------------------------------------------------------------------------------------- noise
-def _random_small_rotations(shape, std, generator=None):
+def _random_small_rotations(shape, std, generator=None, device=None):
     """Rotation matrices [*shape, 3, 3]: random axis, angle ~ N(0, std) (axis-angle -> matrix, Rodrigues)."""
-    axis = torch.nn.functional.normalize(torch.randn(*shape, 3, generator=generator), dim=-1)
-    angle = torch.randn(*shape, 1, 1, generator=generator) * std
+    axis = torch.nn.functional.normalize(torch.randn(*shape, 3, generator=generator, device=device), dim=-1)
+    angle = torch.randn(*shape, 1, 1, generator=generator, device=device) * std
     x, y, z = axis.unbind(-1)
     zero = torch.zeros_like(x)
     Kx = torch.stack([zero, -z, y, z, zero, -x, -y, x, zero], -1).unflatten(-1, (3, 3))  # cross-product matrix
-    return torch.eye(3) + torch.sin(angle) * Kx + (1 - torch.cos(angle)) * Kx @ Kx
+    return torch.eye(3, device=device) + torch.sin(angle) * Kx + (1 - torch.cos(angle)) * Kx @ Kx
 
 
 def add_endpoint_noise(x, n_objects, generator=None):
-    """Return a noised copy of a motion grid x [N, E, F] (in model units). Applied to every row; the caller keeps
-    only the known cells. Robot slot: the 7 arm joints. Object slots 1..n_objects: position and rotation."""
+    """Return a noised copy of motion grids x [..., N, E, F] (model units, any device). Applied to every row; the
+    caller keeps only the known cells. Robot slot: the 7 arm joints. Object slots 1..n_objects: position, rotation."""
     x = x.clone()
+    dev = x.device
     # Arm joints. The grid stores q_norm = 2 (q - lo) / (hi - lo) - 1, so a change of d rad is 2 d / (hi - lo).
-    joint_scale = 2 * NOISE_JOINT / (Q_HI - Q_LO)
-    x[:, 0, :7] += torch.randn(x.shape[0], 7, generator=generator) * joint_scale
+    joint_scale = (2 * NOISE_JOINT / (Q_HI - Q_LO)).to(dev)
+    x[..., 0, :7] += torch.randn(*x.shape[:-2], 7, generator=generator, device=dev) * joint_scale
     if n_objects:
-        objs = x[:, 1:1 + n_objects]
+        objs = x[..., 1:1 + n_objects, :]
         # Position. The grid stores (p - c) / POS_SCALE, so a change of d metres is d / POS_SCALE.
-        objs[..., :3] += torch.randn(*objs.shape[:-1], 3, generator=generator) * (NOISE_OBJ_POS / POS_SCALE)
+        objs[..., :3] += torch.randn(*objs.shape[:-1], 3, generator=generator, device=dev) * (NOISE_OBJ_POS / POS_SCALE)
         # Rotation: decode the 6D rotation, turn it slightly (in the world frame), encode again.
         R = G.rot6d_to_matrix(objs[..., 3:9])
-        dR = _random_small_rotations(objs.shape[:-1], NOISE_OBJ_ROT, generator)
+        dR = _random_small_rotations(objs.shape[:-1], NOISE_OBJ_ROT, generator, dev)
         objs[..., 3:9] = G.matrix_to_rot6d(dR @ R)
     return x
 
@@ -138,6 +139,8 @@ class MotionDataset(torch.utils.data.Dataset):
 
     The motion grids are computed once here (the slow part: resampling to N steps), so __getitem__ only draws a
     goal mode and the noise. Randomness uses torch's global RNG, which DataLoader seeds differently per worker.
+    For training at scale use `make_batch`: the same samples, built for a whole batch at once (optionally on the
+    GPU) from an explicit random generator, so a resumed run draws exactly the same batches.
     """
 
     def __init__(self, episodes, dur_stats=None, p_none=0.1, p_objects=0.3, endpoint_noise=True, shapes=None):
@@ -168,6 +171,33 @@ class MotionDataset(torch.utils.data.Dataset):
         if u < self.p_none:
             return GOAL_NONE
         return GOAL_OBJECTS if u < self.p_none + self.p_objects else GOAL_FULL
+
+    def to(self, device):
+        """Move the stored grids to `device` (they are small: 12k episodes are about 250 MB) for fast make_batch."""
+        self.x0, self.ent_mask = self.x0.to(device), self.ent_mask.to(device)
+        self.log_dur, self.shapes = self.log_dur.to(device), self.shapes.to(device)
+        return self
+
+    def make_batch(self, idx, generator=None):
+        """A batch for episodes idx [B] (same content as collating __getitem__ for each): goal modes, known masks
+        and endpoint noise are drawn for the whole batch at once with `generator` (on the data's device)."""
+        dev = self.x0.device
+        idx = torch.as_tensor(idx, device=dev)
+        B = len(idx)
+        x0 = self.x0[idx]
+        u = torch.rand(B, generator=generator, device=dev)
+        goal = torch.full((B,), GOAL_FULL, device=dev)
+        goal[u < self.p_none + self.p_objects] = GOAL_OBJECTS
+        goal[u < self.p_none] = GOAL_NONE
+        ent = self.ent_mask.expand(B, -1)
+        known = torch.zeros(*x0.shape[:-1], dtype=torch.bool, device=dev)    # [B, N, E]
+        known[:, 0] = ent
+        known[:, -1] = ent & (goal != GOAL_NONE)[:, None]
+        known[:, -1, 0] &= goal == GOAL_FULL                                   # robot end only in the full mode
+        given = add_endpoint_noise(x0, self.n_objects, generator) if self.endpoint_noise else x0
+        x_known = torch.where(known[..., None], given, torch.zeros_like(given))
+        return {"x0": x0, "x_known": x_known, "known": known, "ent_mask": ent, "log_dur": self.log_dur[idx],
+                "shapes": self.shapes.expand(B, *self.shapes.shape), "goal": goal}
 
     def __getitem__(self, i):
         x0 = self.x0[i]

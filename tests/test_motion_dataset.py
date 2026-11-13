@@ -154,3 +154,28 @@ def test_tensors_follow_the_input_device():
     ent_mask = torch.tensor([True, True, True, False], device="meta").expand(2, 4)
     for goal in ("full", "objects", "none"):
         assert known_mask(ent_mask, goal).device.type == "meta"
+
+
+def test_make_batch_matches_getitem_and_is_reproducible(stack_episodes):
+    """make_batch (vectorised, used for training at scale) builds the same samples as __getitem__: same masks per
+    goal mode, same goal frequencies, noise only on the given copy, and identical batches from identical seeds."""
+    from gaussbridge.trajectory import known_mask
+
+    ds = MotionDataset(stack_episodes)
+    idx = torch.randint(len(ds), (4000,), generator=torch.Generator().manual_seed(0))
+    b = ds.make_batch(idx, torch.Generator().manual_seed(1))
+    for g, name in ((GOAL_FULL, "full"), (GOAL_OBJECTS, "objects"), (GOAL_NONE, "none")):
+        sel = b["goal"] == g
+        assert torch.equal(b["known"][sel], known_mask(ds.ent_mask, name).expand(int(sel.sum()), -1, -1))
+    freq = [(b["goal"] == g).float().mean().item() for g in (GOAL_NONE, GOAL_OBJECTS, GOAL_FULL)]
+    assert np.allclose(freq, [0.1, 0.3, 0.6], atol=0.025), freq
+    assert torch.equal(b["x0"], ds.x0[idx]) and torch.equal(b["log_dur"], ds.log_dur[idx])
+    assert (b["x_known"][~b["known"]] == 0).all()
+    k = b["known"][..., None].expand_as(b["x0"])
+    assert not torch.equal(b["x_known"][k], b["x0"][k])                    # noise is on ...
+    assert (b["x_known"][..., 0, 7:9][b["known"][..., 0]] == b["x0"][..., 0, 7:9][b["known"][..., 0]]).all()
+    quiet = MotionDataset(stack_episodes, endpoint_noise=False).make_batch(idx[:50], torch.Generator().manual_seed(1))
+    assert torch.equal(quiet["x_known"][quiet["known"]], quiet["x0"][quiet["known"]])  # ... and can be off
+    again = ds.make_batch(idx, torch.Generator().manual_seed(1))
+    assert all(torch.equal(b[key], again[key]) for key in b)               # same seed -> same batch
+    assert b["shapes"].shape == (4000, K_MAX, 512, 6)
