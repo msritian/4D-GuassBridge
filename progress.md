@@ -155,7 +155,7 @@ Updated as results come in. The PR merges when every **merge blocker** is ticked
 
 | # | Task | Item | Merge blocker? | Status / evidence |
 |---|---|---|---|---|
-| 1 | all | CI green on Linux (planner + simulator tests, which cannot run on a Mac; shared files changed: `trajectory.py`, `kinematics.py`, `CLAUDE.md`) | yes | todo (runs when the PR opens) |
+| 1 | all | CI green on Linux (planner + simulator tests, which cannot run on a Mac; shared files changed: `trajectory.py`, `kinematics.py`, `CLAUDE.md`) | yes | **done**: PR #10 CI run 43496909955, 86 passed, 5 skipped (GPU), 3m38s |
 | 2 | C3 | Batch 256 in bf16 fits a 40 GB GPU (TASKS.md C3 acceptance) | yes | todo: CHTC 8547380 queued (evicted once) |
 | 3 | C4 | GPU trial: full model, bf16, `pytorch_kinematics` install on the node, at least one real CHTC pause → restart → resume, validation metrics, `final_ema.pt` | yes | todo: CHTC 8547386 queued |
 | 4 | C3 | Overfit PickCube (1 object, padded slots on real data) | no (extra check) | running: CHTC 8547379.0 |
