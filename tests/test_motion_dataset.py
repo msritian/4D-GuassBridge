@@ -144,3 +144,13 @@ def test_duration_normalisation(stack_episodes):
 def test_mixing_tasks_is_rejected(stack_episodes):
     with pytest.raises(ValueError):
         MotionDataset(stack_episodes + [fake_episode(150, obj_names=("cube",))])
+
+
+def test_tensors_follow_the_input_device():
+    """Masks built inside helpers must live on the input's device (a CPU-only mask crashed the first GPU memory
+    check, job 8539267). The 'meta' device has shapes but no data, so this catches it without a GPU."""
+    from gaussbridge.trajectory import known_mask
+
+    ent_mask = torch.tensor([True, True, True, False], device="meta").expand(2, 4)
+    for goal in ("full", "objects", "none"):
+        assert known_mask(ent_mask, goal).device.type == "meta"

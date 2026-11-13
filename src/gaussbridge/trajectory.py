@@ -91,7 +91,7 @@ def known_mask(ent_mask, goal="full", n=N_STEPS):
     """[..., n, E] bool of entries held fixed (inpainted). goal: 'full' = start + end of every entity,
     'objects' = robot end unknown, 'none' = start only (forward-only baseline)."""
     assert goal in ("full", "objects", "none"), goal
-    known = torch.zeros(*ent_mask.shape[:-1], n, ent_mask.shape[-1], dtype=torch.bool)
+    known = torch.zeros(*ent_mask.shape[:-1], n, ent_mask.shape[-1], dtype=torch.bool, device=ent_mask.device)
     known[..., 0, :] = ent_mask
     if goal != "none":
         known[..., -1, :] = ent_mask
