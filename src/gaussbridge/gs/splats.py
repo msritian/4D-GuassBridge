@@ -306,15 +306,16 @@ class PartSplats(nn.Module):
 
 
 def init_from_points(points, rgb, part_id, part_names, part_kinds, sh_degree=1, color_mode="sh", normals=None,
-                     part_T=None, init_opacity=0.1, scale_clamp=(1e-4, 0.05), meta=None, **light_kwargs):
+                     part_T=None, point_R=None, init_opacity=0.1, scale_clamp=(1e-4, 0.05), meta=None,
+                     **light_kwargs):
     """PartSplats from canonical-frame points (CLAUDE.md §7.2 init).
 
     points [M,3] are in their part's frame, rgb [M,3] in [0,1] (sRGB as captured), part_id [M] indexes part_names.
     scale = mean distance to the 3 nearest points of the same part, clamped to scale_clamp (m); isotropic, identity
     rotation, opacity init_opacity. "sh": sh0 = rgb_to_sh(rgb), shN = 0. "lit": SH residual = 0, normals given
     (part frame, pointing out of the surface) or estimated by PCA, albedo = linear(rgb) / shading(normal) under the
-    initial lights with the parts posed by part_T [P,4,4] (the configuration the colours were seen in; default
-    identity), clipped to [0.001, 0.999]."""
+    initial lights with the part rotation each colour was seen at: point_R [M,3,3] (points gathered from several
+    configurations), else part_T [P,4,4] (one configuration), else identity; clipped to [0.001, 0.999]."""
     points = torch.as_tensor(points, dtype=torch.float32)
     dev = points.device
     rgb = torch.as_tensor(rgb, dtype=torch.float32, device=dev)
@@ -349,7 +350,9 @@ def init_from_points(points, rgb, part_id, part_names, part_kinds, sh_degree=1, 
     splats = PartSplats(params, part_names, part_kinds, sh_degree, color_mode, meta=meta, **light_kwargs).to(dev)
     if color_mode == "lit":
         with torch.no_grad():
-            if part_T is None:
+            if point_R is not None:
+                R = torch.as_tensor(point_R, dtype=torch.float32, device=dev)
+            elif part_T is None:
                 R = torch.eye(3, device=dev).expand(M, 3, 3)
             else:
                 R = torch.as_tensor(part_T, dtype=torch.float32, device=dev)[part_id, :3, :3]

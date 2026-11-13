@@ -155,6 +155,15 @@ def project(points, viewmat, K):
     return uvw[..., :2] / uvw[..., 2:3], pc[..., 2]
 
 
+def pixel_rays(viewmat, K, width, height):
+    """Unit world-space ray directions [H, W, 3] through every pixel centre of a camera (viewmat [4,4], K [3,3])."""
+    jj, ii = torch.meshgrid(torch.arange(width, dtype=K.dtype, device=K.device) + 0.5,
+                            torch.arange(height, dtype=K.dtype, device=K.device) + 0.5, indexing="xy")
+    uv1 = torch.stack([jj, ii, torch.ones_like(jj)], -1)
+    d_cam = uv1 @ torch.linalg.inv(K).T
+    return F.normalize(d_cam @ viewmat[:3, :3].to(K), dim=-1)  # camera -> world rotation is R^T
+
+
 def backproject(depth, viewmat, K, rows, cols):
     """Pixels (rows, cols) [N] of a z-depth image [H, W] (metres, camera z as ManiSkill) -> world points [N, 3].
     Uses pixel centres (col + 0.5, row + 0.5), the inverse of project() + floor()."""
