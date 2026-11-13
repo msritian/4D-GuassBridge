@@ -25,7 +25,7 @@ Status: todo · in progress · done · blocked
 | B4–B8 | Amogh | todo | — | |
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
-| C3 Dataset + model | Shivam | in progress (2026-11-12) | branch `shivam/c3-motion-model` | plan: dataset → encoders → DiT → flow loss + sampler → overfit 10 episodes |
+| C3 Dataset + model | Shivam | in progress (2026-11-13): code done, overfit passed, memory check pending | `src/gaussbridge/model/{dataset,encoders,dit,flow,evaluate}.py`, `scripts/overfit_motion.py`, `scripts/check_memory.py`, `chtc/{overfit,check_memory}.{sub,sh}`, `tests/test_motion_*.py` | overfit on 10 real episodes: 6 mm / 0.9° / 0.026 rad to the nearest episode, endpoints exact; see C3 below |
 | C4–C9 | Shivam | todo | — | |
 
 ## A1 — randomised planner demos
@@ -105,6 +105,47 @@ PickCube** (1/12 above it, success tolerance is 25 mm); consider 1 cm.
 * Pixel j covers u ∈ [j, j+1) (principal point W/2, H/2): index images with `floor(uv)`. Added to CLAUDE.md §4.
 
 **For the next tasks:** A3 can lift the replay loop from `tests/test_sim_integration.py`.
+
+## C3 — dataset + motion model (Shivam)
+
+**Code** (`src/gaussbridge/model/`, all pure torch, run anywhere):
+* `dataset.py` — `MotionDataset(episodes)`: per sample the clean grid `x0 [128,4,10]`, `known [128,4]`, the given copy
+  `x_known` (endpoint noise 5 mm / 2° / 0.01 rad on the given copy only), `log_dur` normalised with `duration_stats`
+  of the training episodes, cube shape points `[3,512,6]` (`box_shape_points`, same format as
+  `PartSplats.shape_points`). Goal mode per sample: none 0.1 / objects 0.3 / full 0.6.
+* `encoders.py` — `PointSetEncoder` (PointNet). No height-map encoder (constant input in v1, CLAUDE.md §6.4).
+* `dit.py` — `MotionDiT`: 513 tokens (128 steps × 4 slots + duration), 8 blocks, d 384, adaLN-Zero, padded slots masked;
+  30.5 M parameters; predicts 0 at initialisation.
+* `flow.py` — `flow_loss` (logit-normal τ, given cells never noised, loss over free real cells, duration weight 0.1) and
+  `sample` (40 Euler steps, given cells re-imposed every step). Padded slots and the robot spacer feature are held at 0.
+* `evaluate.py` — `motion_errors`: joint rad, finger mm, object mm / deg, duration s.
+* `trajectory.decode_motion` / `motion_to_episode` take `dur_stats` (the model's training stats) for generated motions.
+
+**Tests:** 30 in `tests/test_motion_{dataset,dit,flow,evaluate}.py` (CPU, ~20 s): sample layout, goal-mode masks and
+frequencies, noise sizes, padding isolation, every input reaches the output, batch independence, all parameters get
+gradients, oracle tests (an oracle velocity gives zero loss and the sampler following it lands exactly on the data),
+exact endpoints in all goal modes, a tiny model learning two motions. Every test was checked against a planted bug.
+Two real bugs found this way: a noisy robot spacer feature (train/sample mismatch) and `known_mask` ignoring the device.
+
+**Overfit check** (`scripts/overfit_motion.py`, CHTC job 8539260, A100 MIG 3g.40gb, 10k steps, batch 64, lr 3e-4
+constant, full-goal mode, no endpoint noise; 10 StackCube dev episodes = seeds 0–2; 115 min):
+
+| step | loss | joint (rad) | cube pos (mm) own / nearest | cube rot (deg) | duration (s) own / nearest | endpoints |
+|---|---|---|---|---|---|---|
+| 0 (untrained) | ~1.4 | ~2.0 | ~485 | ~125 | | |
+| 1,000 | 0.172 | 0.050 | 13.9 / 11.8 | 1.89 | 0.53 | exact |
+| 5,000 | 0.014 | 0.032 | 8.8 / 5.7 | 1.11 | 0.43 | exact |
+| 10,000 | 0.011 | 0.036 / **0.026** | 10.5 / **6.0** | **0.97** / 0.93 | 0.57 / **0.04** | **exact (max diff 0)** |
+
+"Nearest" = against the closest of the 10 training episodes. 5 of 10 samples reproduce their own episode (≈ 6 mm,
+duration within 0.03–0.09 s); the other 5 reproduce a sibling with the **same start, same grasp yaw and end states
+within 0.023 rad / 7 mm** (smaller than the endpoint noise), i.e. the same request with two valid answers. So the model
+learned both modes; this is the diversity we want, not a failure. Loss plateaus at ≈ 0.011 (not → 0) with this simple
+recipe (constant lr, no EMA); C4 candidates: lr decay + EMA, and rescaling joint features (arm joints vary with std
+0.06–0.13 in model units vs noise std 1). Results: `runs/overfit_8539260/` locally, `~/gaussbridge/overfit/` on CHTC.
+
+**CHTC lessons** (CLAUDE.md §3.5): Blackwell GPUs fail with torch 2.5.1 → request capability 8.0–9.0; job scripts
+always return logs; one folder per job type under `~/gaussbridge/`.
 
 ## A2 — extraction to Episodes
 

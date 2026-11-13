@@ -221,3 +221,6 @@ __marimo__/
 
 # GaussBridge generated data (lives on CHTC staging, not in git)
 data/
+
+# Training runs / checkpoints (large; results that matter go to results/ or progress.md)
+runs/
