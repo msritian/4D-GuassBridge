@@ -14,7 +14,7 @@ Status: todo · in progress · done · blocked
 |---|---|---|---|---|
 | S0.1 Repo scaffold [S1] | Amogh (Shivam's task) | done on Windows (2026-11-11); Linux = CI | `pyproject.toml`, `src/gaussbridge/__init__.py`, `tests/conftest.py`, `.gitattributes`, `.github/workflows/tests.yml`, README quick start | `pip install -e ".[dev]"` keeps the installed torch; see S0.1 below |
 | S0.2 Laptops [S1] | each | in progress | Amogh: Windows done for B work (2026-11-10), see "Windows setup" | Macs can't run the planner natively (see Findings); use the CPU image below. Windows can't run the planner either (no mplib) |
-| S0.3 Docker + CHTC [S2] | Aditya | in progress | `docker/Dockerfile.cpu` (CPU, lavapipe) | CUDA image (CLAUDE.md §3.4) and CHTC submit files still todo |
+| S0.3 Docker + CHTC [S2] | Aditya | in progress | `docker/Dockerfile.cpu` (CPU, lavapipe) | CPU job files in progress (draft PR); CUDA image (CLAUDE.md §3.4) still todo |
 | A1 Randomised planner | Aditya | done (2026-11-06) | `src/gaussbridge/sim/planner_gen.py`, `scripts/gen_demos.py`, `scripts/plot_refs.py`, `tests/test_planner_gen.py` | 80% / 100% success per attempt; see A1 below |
 | A2 Extraction to Episodes | Aditya | done (2026-11-12) | `src/gaussbridge/sim/extract.py`, `scripts/extract_episodes.py`, `tests/test_extract.py` | 24/24 dev demos: one grasp interval, finger 18.3 mm; see A2 below |
 | A3 Physics replay [A2] | Aditya | todo | — | |
