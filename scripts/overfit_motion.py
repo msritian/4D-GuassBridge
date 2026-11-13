@@ -35,7 +35,7 @@ from gaussbridge.model.dataset import GOAL_FULL, MotionDataset
 from gaussbridge.model.dit import MotionDiT
 from gaussbridge.model.evaluate import motion_errors
 from gaussbridge.model.flow import flow_loss, model_inputs, sample
-from gaussbridge.trajectory import Episode, known_mask
+from gaussbridge.trajectory import Episode, episode_files, known_mask
 
 SIZES = {"full": {}, "tiny": {"d_model": 64, "depth": 2, "heads": 4}}  # full = CLAUDE.md §8.1 defaults
 
@@ -102,7 +102,7 @@ def main():
     args = parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(args.seed)
-    files = sorted(args.episodes.glob("*.npz"))[:args.num_episodes]
+    files = episode_files(args.episodes)[:args.num_episodes]
     if not files:
         raise SystemExit(f"no .npz episodes in {args.episodes}")
     episodes = [Episode.load(f) for f in files]

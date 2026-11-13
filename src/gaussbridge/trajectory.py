@@ -54,6 +54,15 @@ class Episode:
         return cls(**d)
 
 
+def episode_files(directory):
+    """Sorted Episode .npz files of a directory, skipping macOS "._*" metadata files (AppleDouble): macOS tar stores
+    one per file, they also end in .npz, and on Linux they unpack as real files that np.load cannot read (CHTC job
+    8547386 crashed on them). Every script that lists episodes should use this."""
+    from pathlib import Path
+
+    return sorted(f for f in Path(directory).glob("*.npz") if not f.name.startswith("._"))
+
+
 def resample(x, n, kind="linear"):
     """[T, ...] samples evenly spaced in time -> [n, ...]. kind: 'linear', 'slerp' (wxyz quaternions, last dim)
     or 'hold' (nearest sample; gripper / attached). First and last samples are kept exactly."""

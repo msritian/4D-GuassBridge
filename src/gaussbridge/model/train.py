@@ -39,7 +39,7 @@ import yaml
 from gaussbridge.model.dataset import MotionDataset
 from gaussbridge.model.dit import MotionDiT
 from gaussbridge.model.flow import flow_loss, sample
-from gaussbridge.trajectory import Episode, decode_motion, known_mask
+from gaussbridge.trajectory import Episode, decode_motion, episode_files, known_mask
 
 EXIT_PAUSED = 85  # HTCondor checkpoint_exit_code: "not finished, resume me"
 
@@ -115,7 +115,7 @@ def step_generator(seed, step, device):
 
 
 def load_episode_dir(path):
-    files = sorted(Path(path).glob("*.npz"))
+    files = episode_files(path)
     if not files:
         raise FileNotFoundError(f"no .npz episodes in {path}")
     return [Episode.load(f) for f in files]

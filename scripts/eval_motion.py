@@ -27,14 +27,14 @@ from gaussbridge.eval import metrics as M
 from gaussbridge.eval.baselines import straight_line
 from gaussbridge.model.dataset import MotionDataset
 from gaussbridge.sim.kinematics import PandaFK
-from gaussbridge.trajectory import Episode, decode_motion, known_mask
+from gaussbridge.trajectory import Episode, decode_motion, episode_files, known_mask
 
 GOALS = ("objects", "full")
 
 
 def load_cases(episode_dir):
     """Episodes grouped by start seed -> (dataset over all episodes, {seed: [indices]})."""
-    files = sorted(Path(episode_dir).glob("*.npz"))
+    files = episode_files(episode_dir)
     if not files:
         raise SystemExit(f"no .npz episodes in {episode_dir}")
     episodes = [Episode.load(f) for f in files]
