@@ -17,7 +17,7 @@ Status: todo · in progress · done · blocked
 | S0.3 Docker + CHTC [S2] | Aditya | in progress | `docker/Dockerfile.cpu` (CPU, lavapipe) | CUDA image (CLAUDE.md §3.4) and CHTC submit files still todo |
 | A1 Randomised planner | Aditya | done (2026-11-06) | `src/gaussbridge/sim/planner_gen.py`, `scripts/gen_demos.py`, `scripts/plot_refs.py`, `tests/test_planner_gen.py` | 80% / 100% success per attempt; see A1 below |
 | A2 Extraction to Episodes | Aditya | done (2026-11-12) | `src/gaussbridge/sim/extract.py`, `scripts/extract_episodes.py`, `tests/test_extract.py` | 24/24 dev demos: one grasp interval, finger 18.3 mm; see A2 below |
-| A3 Physics replay [A2] | Aditya | in progress (2026-11-12) | — | draft PR open |
+| A3 Physics replay [A2] | Aditya | done (2026-11-13) | `src/gaussbridge/sim/replay.py`, `scripts/replay_episodes.py` | 40/40 succeed after round trip, end error ≤ 5.6 mm (bound 1 cm); see A3 below |
 | A4–A7 | Aditya | todo | — | |
 | B1 Capture environments | Amogh | done (2026-11-11) | `src/gaussbridge/sim/envs.py`, `src/gaussbridge/sim/capture.py`, `geometry.backproject`, `tests/test_capture.py`, `scripts/check_lighting.py`, `results/lighting/` | reprojection agreement 99.94–99.96%; lighting confirmed (21 dB cap); see B1 below |
 | B2 Asset-mode captures | Amogh | done (2026-11-11) | `sim/capture.py` (`random_configs`, `apply_config`, `capture_configs`, `view_valid`, save/load), `scripts/capture_assets.py`, `tests/test_configs.py`, `results/b2/` | every visual robot link in ≥ 67 training views (need 20); see B2 below |
@@ -93,8 +93,7 @@ Diversity plot: `python scripts/plot_refs.py data/raw/StackCube-v1/dev StackCube
 | PickCube-v1 | 12/12 | 0.0014 rad | 5.6 mm |
 
 PickCube's end error is mostly not from resampling: replaying measured qpos as targets (the §6.2 action definition)
-already gives up to 3.3 mm vs 0.7–2.0 mm with the planner's own actions. **A3: the 5 mm bound is tight for
-PickCube** (1/12 above it, success tolerance is 25 mm); consider 1 cm.
+already gives up to 3.3 mm vs 0.7–2.0 mm with the planner's own actions. A3's bound is now 1 cm (see A3).
 
 **Decisions made:**
 * Gripper / attached are resampled by nearest sample (keeps endpoints exact); recorded in CLAUDE.md §6.3.
@@ -127,6 +126,31 @@ holds at the end, knobs sidecar matched by episode id. `test_sim_integration.py`
 | PickCube-v1 | 12/12 | 18.3–20.5 mm, median 18.3 | ≤ 4.4 mm | yes |
 The first held step reads ≈ 20.5 mm (fingers still closing), then 18.3 mm. CLAUDE.md §5 said "1–3 mm" to the TCP;
 updated to ≤ 5 mm.
+
+## A3 — physics replay
+
+```bash
+python scripts/replay_episodes.py data/episodes/StackCube-v1/train/*.npz --n 20 [--round-trip]   # A4 acceptance
+```
+`sim.replay.replay(ep, env=None)` resets with `ep.meta["seed"]` (raises if that does not reproduce the episode's
+start, > 1 mm), runs `ep.actions()` + 10 hold steps (`pd_joint_pos`, physx_cpu) and returns
+`{"success", "obj_end_err" [K] m}`. Reuse one simulator with `make_env(env_id)`. Generated episodes need
+`meta["env_id"]` and `meta["seed"]` (the start seed) to be replayable.
+
+**Tests:** `test_sim_integration.py`'s round-trip test now replays with `replay()` and also checks that a demo cut
+halfway is reported as a failure (so the check can fail).
+
+**Acceptance** (5 seeds × 4 refs per task, seeds 0–4, round trip = Episode → 128-step motion → Episode):
+| Task | Replay | Success | Max joint path error | Max object end error |
+|---|---|---|---|---|
+| StackCube-v1 | round trip | 20/20 | 0.0015 rad | 3.96 mm |
+| StackCube-v1 | as recorded | 20/20 | — | 5.97 mm |
+| PickCube-v1 | round trip | 20/20 | 0.0014 rad | 5.64 mm |
+| PickCube-v1 | as recorded | 20/20 | — | 3.4 mm |
+All pass with the object end-error bound at **1 cm** (decided 2026-11-13; TASKS.md said 5 mm). Even unmodified
+recorded demos replay up to 6 mm off: replaying measured joint positions as targets (§6.2 actions) lets objects
+settle a few mm differently, independent of the round trip, so 5 mm flagged good demos. Both tasks' success
+tolerances are ≥ 25 mm, and 1 cm matches the §8.3 release-error rejection threshold.
 
 ## S0.1 — repo scaffold
 

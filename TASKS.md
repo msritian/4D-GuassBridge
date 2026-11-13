@@ -49,11 +49,12 @@ Status legend: todo · in progress · blocked · done
 - Acceptance: unit test on a generated shard: `attached` is True on a single contiguous interval per moved object,
   finger ≈ 0.018 m inside it, cubeB never attached (StackCube).
 
-### A3 Physics replay tool — deps A2 — owner: Aditya — Status: in progress (2026-11-12)
+### A3 Physics replay tool — deps A2 — owner: Aditya — Status: done (2026-11-13), see progress.md
 - `sim/replay.py`: reset with seed (or `set_state_dict`), execute `actions_pd_joint_pos` + 10 hold steps, return
   success and per-object end error.
 - Acceptance (regression test, already verified once): planner episode → `episode_to_motion` (N=128) →
-  `motion_to_episode` → replay: 100% success on 20 episodes, joint error < 0.01 rad, object end error < 5 mm.
+  `motion_to_episode` → replay: 100% success on 20 episodes, joint error < 0.01 rad, object end error < 1 cm
+  (was 5 mm; changed 2026-11-13 because unmodified planner demos already replay up to 6 mm off, see progress.md A3).
 
 ### A4 Full datasets on CHTC — deps A1–A3, S0.3 — Status: todo
 - Shards of 50 seeds per CPU job; seed ranges and sizes in §6.1 (train/val/test/policy-real) for StackCube, then PickCube.

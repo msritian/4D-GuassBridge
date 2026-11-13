@@ -1,4 +1,5 @@
-"""C1 + A2 checked against ManiSkill and the A1 planner. Needs ManiSkill + mplib (Linux): run in docker/Dockerfile.cpu."""
+"""C1, A2, A3 checked against ManiSkill and the A1 planner. Needs ManiSkill + mplib (Linux): run in docker/Dockerfile.cpu."""
+import dataclasses
 import math
 
 import numpy as np
@@ -11,6 +12,7 @@ import gymnasium as gym  # noqa: E402
 from gaussbridge import geometry as G  # noqa: E402
 from gaussbridge.sim.extract import load_shard  # noqa: E402
 from gaussbridge.sim.planner_gen import generate  # noqa: E402
+from gaussbridge.sim.replay import make_env, replay  # noqa: E402
 from gaussbridge.trajectory import Episode, episode_to_motion, motion_to_episode  # noqa: E402
 
 OBJECTS = {"StackCube-v1": ["cubeA", "cubeB"], "PickCube-v1": ["cube"]}
@@ -60,13 +62,11 @@ def test_planner_demo_survives_motion_round_trip_and_replays(tmp_path, env_id):
                                    G.quat_to_matrix(torch.as_tensor(ep.obj_pose[i, :, 3:])), atol=1e-5)
     assert np.abs(ep2.robot_qpos[:, :7] - ep.robot_qpos[:, :7]).max() < 0.01  # whole path, rad
 
-    env = _make_env(env_id, obs_mode="none", control_mode="pd_joint_pos", max_episode_steps=1000)
-    env.reset(seed=ep.meta["seed"])
-    actions = ep2.actions()
-    for a in np.concatenate([actions, np.repeat(actions[-1:], 10, 0)]):  # + 10 hold steps
-        _, _, _, _, info = env.step(a)
-    u = env.unwrapped
-    end_err = max(np.linalg.norm(getattr(u, n).pose.p[0].numpy() - ep.obj_pose[-1, k, :3])
-                  for k, n in enumerate(ep.obj_names))
+    env = make_env(env_id)
+    r = replay(ep2, env)  # A3
+    assert r["success"] and r["obj_end_err"].max() < 0.01, r  # 1 cm: replay settles cubes up to ~6 mm apart
+    n = ep.num_steps // 2 + 1  # the check must also be able to fail: stopping halfway solves nothing
+    half = dataclasses.replace(ep, robot_qpos=ep.robot_qpos[:n], gripper_cmd=ep.gripper_cmd[:n],
+                               obj_pose=ep.obj_pose[:n], attached=ep.attached[:n])
+    assert not replay(half, env)["success"]
     env.close()
-    assert bool(info["success"].item()) and end_err < 0.005, end_err
