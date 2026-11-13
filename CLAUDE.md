@@ -387,6 +387,11 @@ Extraction: `robot_qpos = env_states/articulations/<uid>[:, 13:22]`, `base_pose 
 ### 6.4 Scene conditioning
 * **Shape tokens:** per object, P = 512 canonical-frame points `[xyz, rgb]` = centres + base colour of that object's
   Gaussians (opacity > 0.5). Before Gaussians exist, use analytic box-surface samples (half 0.02, red/green).
+  **Changed in B4 (2026-11-13): use `gs.render.surface_points`** (render the part alone from 32 directions,
+  back-project pixels with α > 0.5, colour = rendered base colour). Reconstruction makes each cube a shell of faint
+  surface Gaussians around large opaque interior blobs, so opaque centres only reach ±0.013 m on a ±0.02 m cube;
+  rendered-surface samples reach a median 0.019 m. Files: `assets/<env>/<obj>.points.npy` (StackCube copies in
+  `artifacts/assets/`). **C6: fit collision spheres to these points, not to Gaussian centres** (same bias).
 * **Height map:** 64×64 over x,y ∈ [−0.4, 0.4] m of the **static** background (table) from background Gaussians or
   sim; constant (flat) for v1 tasks, kept for generality.
 * Endpoint-noise augmentation on the *known copy* only: objects 5 mm / 2°, joints 0.01 rad.
@@ -421,6 +426,25 @@ for each sampled training view, pose all parts with that configuration's `part_T
 * Densify with `DefaultStrategy` (`scene_scale=1.0`, refine 500→5000 every 100, opacity reset 3000), 7k iterations,
   1 view per iteration. Expected: a few minutes on one A100/L40S.
 * Optional `refine_poses`: learnable se(3) delta per (config, part), lr 1e-4, config 0 fixed (real captures).
+* **As built (B4, 2026-11-12, `gs/recon.py`, `gs/background.py`, `scripts/train_recon.py`):** changes vs the plan above:
+  * **Far ground + sky = `EnvMap`**, an equirectangular texture over world ray direction (512 elevation × 128 azimuth
+    rows/cols, wraps at ±180°) composited behind the splats (`render(..., env=)`: `rgb + (1 − α)·env(ray)`).
+    The ground is an untextured-looking grey (mean (108,112,120)/255, std ≈ 5) under world-fixed lights, so far
+    away its colour depends on direction only; above the horizon the sky is black. Ground pixels farther than
+    `ground_radius` = 2.5 m (horizontal, from (−0.15, 0)) are relabelled "ignore" and left to the EnvMap; the cut
+    is in world space, not camera depth, so every camera agrees which ground points are Gaussians. Saved as
+    `assets/<env>/background.pt`; B5 must pass it to `render`.
+  * **Init from all training configurations**, not one: ≤ 512 random pixels per (view, part), then ≤ 20k per part;
+    normals from depth (central differences, oriented to the camera) for `"lit"`; albedo divides by the shading at
+    the pose each point was seen in (`init_from_points(point_R=...)`).
+  * **Losses:** `0.8·L1 + 0.2·(1−SSIM) + 1.0·|D − D_gt| + 0.05·CE + 0.1·|α − fg|`. Depth weight 1.0 (not 0.1:
+    L1 in metres is ~1e-3, so 0.1 made it vanish); added a foreground-mask term (α → 1 on labelled pixels, 0 on
+    sky/far ground). CE is on alpha-normalised one-hot label features.
+  * `color_mode="lit"`, SH residual degree 1; **lights fixed** at ManiSkill's exact values (learning them only adds an
+    albedo-scale ambiguity). Views: policy cameras sampled with p = 0.25, ring views otherwise, invalid views skipped.
+  * 30k iterations, gsplat trainer learning rates, `DefaultStrategy` refine 500→15k every 100.
+    **gsplat 1.5.3 never resets opacities:** `step % reset_every == 0 & step > 0` parses as a chained comparison
+    ending in `0 > 0`, so `reset_every` only affects the "prune too big" rule.
 
 Uses:
 1. **Asset mode (sim, built once per task):** R = 8 configurations: robot = rest + U(±0.6) per arm joint (clipped
@@ -624,7 +648,8 @@ gaussbridge/
     sim/capture.py       part_table (seg id -> part), capture_state, random_configs
     sim/replay.py        physics replay of pd_joint_pos actions
     gs/splats.py         PartSplats (compose, local-frame SH colours, save/load/subset/merge), init_from_points
-    gs/recon.py          articulated multi-config reconstruction (+ pose refinement)
+    gs/recon.py          articulated multi-config reconstruction (+ pose refinement), evaluate/summarize
+    gs/background.py     EnvMap: background colour per world ray direction (far ground + sky)
     gs/render.py         render (rgb, depth, alpha, labels, scene flow), optical_flow, tracks
     gs/raster.py         gsplat on CUDA; dense PyTorch rasteriser for CPU tests (matches gsplat to ~2e-6)
     model/encoders.py    PointSetEncoder, HeightMapEncoder

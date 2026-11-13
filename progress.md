@@ -22,7 +22,8 @@ Status: todo · in progress · done · blocked
 | B1 Capture environments | Amogh | done (2026-11-11) | `src/gaussbridge/sim/envs.py`, `src/gaussbridge/sim/capture.py`, `geometry.backproject`, `tests/test_capture.py`, `scripts/check_lighting.py`, `results/lighting/` | reprojection agreement 99.94–99.96%; lighting confirmed (21 dB cap); see B1 below |
 | B2 Asset-mode captures | Amogh | done (2026-11-11) | `sim/capture.py` (`random_configs`, `apply_config`, `capture_configs`, `view_valid`, save/load), `scripts/capture_assets.py`, `tests/test_configs.py`, `results/b2/` | every visual robot link in ≥ 67 training views (need 20); see B2 below |
 | B3 PartSplats + composition | Amogh | done (2026-11-12) | `src/gaussbridge/gs/{splats,raster,render}.py`, `geometry.viewmat_to_campos`, `tests/test_splats.py`, `scripts/check_splats_capture.py`, `results/b3/` | dense rasteriser vs gsplat 2.3e-6; part+camera rotation invariance 2e-5; lit colour model built; see B3 below |
-| B4–B8 | Amogh | todo | — | |
+| B4 Articulated reconstruction | Amogh | in progress (2026-11-12) | — | |
+| B5–B8 | Amogh | todo | — | |
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
 | C3–C9 | Shivam | todo | — | |
@@ -226,6 +227,55 @@ Two findings for B4: (a) the far floor (> 3 m, dropped by §7.2's init rule) is 
 must be modelled; (b) blurry init Gaussians of `panda_hand` (sized for the far rings) bleed into the bottom of the
 hand camera from ~3 cm away; label errors there are almost all `panda_hand`, which training on hand-camera views
 should fix.
+
+## B4 — articulated reconstruction
+
+**Run:** `python scripts/train_recon.py --captures data/assets/<task>/captures.pt` (30k iterations; `--set key=value`
+overrides any `ReconConfig` field). Writes `scene.splats.pt`, `background.pt`, `<object>.points.npy` and
+`recon.json` next to the captures, and `results/b4/<task>.recon.{json,png}`.
+
+**What exists**
+* `gs/recon.py`: `reconstruct(cap, ReconConfig)` → (PartSplats, EnvMap, info). Init by back-projecting every training
+  configuration into part frames (normals from depth); loss `0.8·L1 + 0.2·(1−SSIM) + 1.0·depth + 0.05·label CE +
+  0.1·mask`; gsplat `DefaultStrategy` densification (non-trainable `part_id`, albedo, normals carried along);
+  optional `PoseRefiner` (se(3) per config × part, config 0 fixed). `evaluate` / `summarize` for held-out metrics.
+* `gs/background.py`: `EnvMap`, background colour per world ray direction for the ground beyond 2.5 m and the sky
+  (B3 finding (a)). `render(..., env=)` composites it; **B5 must load `background.pt` and pass it**.
+* `geometry.pixel_rays`, `init_from_points(point_R=)` (colours seen in several configurations).
+* `tests/test_recon.py` (9, CPU): pixel rays, EnvMap wrap/save, compositing, depth normals of a plane, far-ground
+  relabelling, pose refinement recovers a 1.5 cm offset to < 4 mm, end-to-end synthetic reconstruction
+  generalises to a held-out configuration (28–34 dB). Full suite 43 passed.
+
+**Acceptance** (held-out configurations 8 and 9; 30k iterations, 66 / 63 min on an RTX 4060 laptop):
+| Task | base_camera 128² | rings 256² (capture res) | label acc (base / rings) | hand_camera 128² | Gaussians |
+|---|---|---|---|---|---|
+| StackCube-v1 | **30.8 dB** (32.4 / 29.2), SSIM 0.93 | **28.3 dB** (min 23.7), SSIM 0.89 | **99.3% / 99.6%** | 24.9 dB (23.7 / 26.0), SSIM 0.75 | 1.42M (1.08M table) |
+| PickCube-v1 | **31.8 dB** (34.7 / 28.8), SSIM 0.94 | **28.6 dB** (min 23.7), SSIM 0.89 | **99.2% / 99.6%** | — (no hand camera) | 1.31M (1.02M table) |
+Targets (TASKS.md B4): ≥ 28 dB base_camera, ≥ 26 dB capture res, ≥ 95% labels. base_camera mask IoU 0.989
+(B3 raw init: 0.77; the far floor is fixed).
+
+**Known weakness: hand camera (≈ 25 dB, not part of the acceptance).** Geometry and labels are right (IoU 0.999,
+labels 99.8%); the loss is close-up texture: the wood grain the hand camera sees from a few cm is blurred, and the
+table's view-dependent specular streak is missing. Main cause: only 8 hand-camera training views, so the table
+patches it sees in a new configuration were only observed from the rings (≥ 0.5 m away); the degree-1 SH
+residual cannot form a sharp highlight. Plan: measure it on real trajectories in B5 (mostly cubes and fingers in
+view); if < ~26 dB there, capture ~40 extra configurations with only the policy cameras (0.34 s each) and/or raise
+the SH degree. Asset size: 176 MB, 76% of Gaussians on the table (densification chases the wood grain).
+
+**Shape points for C3/C6 (changed vs CLAUDE.md §6.4's first plan).** After training, a cube is ~11k faint
+(opacity < 0.1) surface Gaussians around ~2.3k opaque 5 mm blobs centred ≈ 9 mm from the middle. Renders are right,
+but "centres of Gaussians with opacity > 0.5" only reach ±13–15 mm on a ±20 mm cube (30% too small; collision spheres
+from them would miss contacts). `gs.render.surface_points` samples the rendered surface instead: median 18.9 mm,
+colours red/green as expected. `cubeA/cubeB.points.npy` (StackCube) and `cube.points.npy` (PickCube, median 18.8 mm),
+512 × [xyz, rgb] in the cube frame, are committed in `artifacts/assets/<task>/` for C3.
+
+**Open issue: floaters.** Both models have background (`table-workspace`) Gaussians hovering 3–7 cm above the table,
+some coloured like a cube (red ≈ (0.95, 0.24, 0.15), opacity 0.3–0.4). They show up as small specks in every
+held-out view: base_camera 25 px (StackCube) / 42 px (PickCube) over 2 views, rings ≈ 100 px per 256² view
+(counted as: rendered table, captured table, rendered depth ≥ 1 cm in front, colour error > 0.15). Tiny for PSNR,
+but a red 4-px speck on the table looks like a distant cube to a policy (the real cube is ~8-10 px wide in base_camera).
+Likely cause: a Gaussian between some training camera and the cube gets coloured to match the cube pixels behind it,
+and nothing removes it — gsplat 1.5.3's opacity reset never fires (CLAUDE.md §7.2) and the label term is weak (0.05).
 
 ## Windows setup (Amogh, 2026-11-10; RTX 4060 Laptop 8 GB, driver 616.56)
 

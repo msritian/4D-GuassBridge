@@ -1,0 +1,1208 @@
+{
+ "task": "StackCube-v1",
+ "git": "2d5eb92ed817e4fda207c4c39aac3549c9e59c2f",
+ "config": {
+  "iters": 30000,
+  "color_mode": "lit",
+  "sh_degree": 1,
+  "max_points": 20000,
+  "max_pixels_per_view_part": 512,
+  "init_opacity": 0.1,
+  "scale_clamp": [
+   0.0001,
+   0.05
+  ],
+  "ground_radius": 2.5,
+  "ground_center": [
+   -0.15,
+   0.0
+  ],
+  "p_policy": 0.25,
+  "lambda_ssim": 0.2,
+  "lambda_depth": 1.0,
+  "lambda_label": 0.05,
+  "lambda_mask": 0.1,
+  "lr_means": 0.00016,
+  "lr_means_final": 0.01,
+  "lr_scales": 0.005,
+  "lr_quats": 0.001,
+  "lr_opacities": 0.05,
+  "lr_sh0": 0.0025,
+  "lr_shN": 0.000125,
+  "lr_albedo": 0.01,
+  "lr_normals": 0.001,
+  "lr_env": 0.01,
+  "lr_lights": 0.0,
+  "densify": true,
+  "refine_start": 500,
+  "refine_stop": 15000,
+  "refine_every": 100,
+  "reset_every": 3000,
+  "grow_grad2d": 0.0002,
+  "refine_poses": false,
+  "lr_pose": 0.0001,
+  "pose_fixed": [
+   0
+  ],
+  "backend": "auto",
+  "seed": 0,
+  "log_every": 500
+ },
+ "num_gaussians": 1419454,
+ "counts": {
+  "panda_link0": 24036,
+  "panda_link1": 21347,
+  "panda_link2": 21067,
+  "panda_link3": 23952,
+  "panda_link4": 25459,
+  "panda_link5": 33188,
+  "panda_link6": 29268,
+  "panda_link7": 21561,
+  "panda_link8": 0,
+  "panda_hand": 22873,
+  "panda_hand_tcp": 0,
+  "panda_leftfinger": 18109,
+  "panda_rightfinger": 22948,
+  "camera_base_link": 0,
+  "camera_link": 13911,
+  "table-workspace": 1078069,
+  "ground": 33348,
+  "cubeA": 14913,
+  "cubeB": 15405
+ },
+ "seconds": 3977.2,
+ "num_train_views": 428,
+ "train_configs": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "heldout_configs": [
+  8,
+  9
+ ],
+ "heldout": {
+  "base_camera": {
+   "psnr": 30.816950798034668,
+   "ssim": 0.9303551018238068,
+   "mask_iou": 0.9893704354763031,
+   "label_acc": 0.9928277134895325,
+   "min_psnr": 29.196928024291992,
+   "views": 2
+  },
+  "hand_camera": {
+   "psnr": 24.86680316925049,
+   "ssim": 0.7518121600151062,
+   "mask_iou": 0.9987795948982239,
+   "label_acc": 0.9975478649139404,
+   "min_psnr": 23.72686767578125,
+   "views": 2
+  },
+  "rings": {
+   "psnr": 28.29549580353957,
+   "ssim": 0.8859589816286013,
+   "mask_iou": 0.9980570633824055,
+   "label_acc": 0.9958535644870538,
+   "min_psnr": 23.70612335205078,
+   "views": 104
+  }
+ },
+ "lights": {
+  "ambient": [
+   0.30000001192092896,
+   0.30000001192092896,
+   0.30000001192092896
+  ],
+  "intensity": [
+   0.31830987334251404,
+   0.31830987334251404
+  ]
+ },
+ "views": [
+  {
+   "config": 8,
+   "camera": "base_camera",
+   "policy": true,
+   "size": 128,
+   "psnr": 32.436973571777344,
+   "ssim": 0.938037097454071,
+   "mask_iou": 0.9889217019081116,
+   "label_acc": 0.9967637658119202
+  },
+  {
+   "config": 9,
+   "camera": "base_camera",
+   "policy": true,
+   "size": 128,
+   "psnr": 29.196928024291992,
+   "ssim": 0.9226731061935425,
+   "mask_iou": 0.9898191690444946,
+   "label_acc": 0.9888916611671448
+  },
+  {
+   "config": 8,
+   "camera": "hand_camera",
+   "policy": true,
+   "size": 128,
+   "psnr": 23.72686767578125,
+   "ssim": 0.7194520235061646,
+   "mask_iou": 0.9979895949363708,
+   "label_acc": 0.9968173503875732
+  },
+  {
+   "config": 9,
+   "camera": "hand_camera",
+   "policy": true,
+   "size": 128,
+   "psnr": 26.006738662719727,
+   "ssim": 0.7841722965240479,
+   "mask_iou": 0.9995695948600769,
+   "label_acc": 0.9982783794403076
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.202869415283203,
+   "ssim": 0.8958520293235779,
+   "mask_iou": 0.9946079850196838,
+   "label_acc": 0.9975850582122803
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.234806060791016,
+   "ssim": 0.8990659713745117,
+   "mask_iou": 0.9965752363204956,
+   "label_acc": 0.9966159462928772
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 23.70612335205078,
+   "ssim": 0.8168784976005554,
+   "mask_iou": 0.9943692684173584,
+   "label_acc": 0.9966711401939392
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 23.920284271240234,
+   "ssim": 0.8313121795654297,
+   "mask_iou": 0.9943150281906128,
+   "label_acc": 0.9962726831436157
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 24.171724319458008,
+   "ssim": 0.8109702467918396,
+   "mask_iou": 0.9959803819656372,
+   "label_acc": 0.9964216947555542
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 24.097707748413086,
+   "ssim": 0.8252485990524292,
+   "mask_iou": 0.9949273467063904,
+   "label_acc": 0.9964288473129272
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.143505096435547,
+   "ssim": 0.8860406279563904,
+   "mask_iou": 0.9970281720161438,
+   "label_acc": 0.9955761432647705
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.025596618652344,
+   "ssim": 0.8812052011489868,
+   "mask_iou": 0.9955349564552307,
+   "label_acc": 0.9961457848548889
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.606964111328125,
+   "ssim": 0.8594450950622559,
+   "mask_iou": 0.9956838488578796,
+   "label_acc": 0.99563068151474
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.14952278137207,
+   "ssim": 0.8736981153488159,
+   "mask_iou": 0.996333122253418,
+   "label_acc": 0.996555745601654
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.82127571105957,
+   "ssim": 0.8717753291130066,
+   "mask_iou": 0.9953321814537048,
+   "label_acc": 0.9946188926696777
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.883094787597656,
+   "ssim": 0.8872233629226685,
+   "mask_iou": 0.9953687191009521,
+   "label_acc": 0.9958525896072388
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.951244354248047,
+   "ssim": 0.9048170447349548,
+   "mask_iou": 0.9972295761108398,
+   "label_acc": 0.9966496825218201
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 31.26024627685547,
+   "ssim": 0.9091700315475464,
+   "mask_iou": 0.9982850551605225,
+   "label_acc": 0.9968844056129456
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.730022430419922,
+   "ssim": 0.8862603902816772,
+   "mask_iou": 0.9956390261650085,
+   "label_acc": 0.9958476424217224
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.863040924072266,
+   "ssim": 0.8978209495544434,
+   "mask_iou": 0.9946160316467285,
+   "label_acc": 0.9962764382362366
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a08",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.363445281982422,
+   "ssim": 0.8801729083061218,
+   "mask_iou": 0.9958459138870239,
+   "label_acc": 0.9970654249191284
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a08",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.649463653564453,
+   "ssim": 0.8952221870422363,
+   "mask_iou": 0.9960489869117737,
+   "label_acc": 0.9974183440208435
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a09",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.52266502380371,
+   "ssim": 0.9157624244689941,
+   "mask_iou": 0.9915132522583008,
+   "label_acc": 0.9981307983398438
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a09",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.60620880126953,
+   "ssim": 0.9243154525756836,
+   "mask_iou": 0.9940734505653381,
+   "label_acc": 0.9970795512199402
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a10",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.206418991088867,
+   "ssim": 0.863044261932373,
+   "mask_iou": 0.9923073053359985,
+   "label_acc": 0.9978275299072266
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a10",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.134265899658203,
+   "ssim": 0.8795930743217468,
+   "mask_iou": 0.9954043626785278,
+   "label_acc": 0.9963216185569763
+  },
+  {
+   "config": 8,
+   "camera": "wide_e20_a11",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.398183822631836,
+   "ssim": 0.8591035604476929,
+   "mask_iou": 0.9916918277740479,
+   "label_acc": 0.9974321722984314
+  },
+  {
+   "config": 9,
+   "camera": "wide_e20_a11",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.369613647460938,
+   "ssim": 0.8780415058135986,
+   "mask_iou": 0.9946398735046387,
+   "label_acc": 0.9966609477996826
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.7769775390625,
+   "ssim": 0.891268253326416,
+   "mask_iou": 0.9970183968544006,
+   "label_acc": 0.9969148635864258
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.11037254333496,
+   "ssim": 0.8880360126495361,
+   "mask_iou": 0.9979557394981384,
+   "label_acc": 0.9950878620147705
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.797693252563477,
+   "ssim": 0.8303191065788269,
+   "mask_iou": 0.998195469379425,
+   "label_acc": 0.9970517754554749
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.058923721313477,
+   "ssim": 0.8424903750419617,
+   "mask_iou": 0.9977688193321228,
+   "label_acc": 0.9955689311027527
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.040706634521484,
+   "ssim": 0.8462451696395874,
+   "mask_iou": 0.9986934661865234,
+   "label_acc": 0.9963043332099915
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.678070068359375,
+   "ssim": 0.8618518710136414,
+   "mask_iou": 0.9979636669158936,
+   "label_acc": 0.9959773421287537
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.314313888549805,
+   "ssim": 0.8738069534301758,
+   "mask_iou": 0.999252200126648,
+   "label_acc": 0.9951080679893494
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.932825088500977,
+   "ssim": 0.8660733103752136,
+   "mask_iou": 0.9988325834274292,
+   "label_acc": 0.9957468509674072
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.250547409057617,
+   "ssim": 0.8562530875205994,
+   "mask_iou": 0.9989069104194641,
+   "label_acc": 0.9935181140899658
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.17572593688965,
+   "ssim": 0.8673868179321289,
+   "mask_iou": 0.9989843964576721,
+   "label_acc": 0.9953960180282593
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.148693084716797,
+   "ssim": 0.8637908697128296,
+   "mask_iou": 0.9989623427391052,
+   "label_acc": 0.9954473972320557
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.001855850219727,
+   "ssim": 0.8751746416091919,
+   "mask_iou": 0.9991171360015869,
+   "label_acc": 0.9963226914405823
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.56051254272461,
+   "ssim": 0.8924708366394043,
+   "mask_iou": 0.9984035491943359,
+   "label_acc": 0.9950249195098877
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.285730361938477,
+   "ssim": 0.8928906917572021,
+   "mask_iou": 0.9988099932670593,
+   "label_acc": 0.9965322613716125
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.944204330444336,
+   "ssim": 0.8729434013366699,
+   "mask_iou": 0.9980908632278442,
+   "label_acc": 0.996375322341919
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.875244140625,
+   "ssim": 0.8742663264274597,
+   "mask_iou": 0.9993202090263367,
+   "label_acc": 0.9957345724105835
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a08",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.451007843017578,
+   "ssim": 0.885199248790741,
+   "mask_iou": 0.9982590675354004,
+   "label_acc": 0.9968317747116089
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a08",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.341726303100586,
+   "ssim": 0.8811261057853699,
+   "mask_iou": 0.9988924264907837,
+   "label_acc": 0.9955054521560669
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a09",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.373380661010742,
+   "ssim": 0.9221135973930359,
+   "mask_iou": 0.9966867566108704,
+   "label_acc": 0.9975892901420593
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a09",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.542102813720703,
+   "ssim": 0.9236084818840027,
+   "mask_iou": 0.9987077116966248,
+   "label_acc": 0.9960416555404663
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a10",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.469337463378906,
+   "ssim": 0.9010598063468933,
+   "mask_iou": 0.9965919256210327,
+   "label_acc": 0.997555136680603
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a10",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.747364044189453,
+   "ssim": 0.89549720287323,
+   "mask_iou": 0.9985913634300232,
+   "label_acc": 0.9962834715843201
+  },
+  {
+   "config": 8,
+   "camera": "wide_e45_a11",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.445301055908203,
+   "ssim": 0.8806853294372559,
+   "mask_iou": 0.9961718916893005,
+   "label_acc": 0.9961780905723572
+  },
+  {
+   "config": 9,
+   "camera": "wide_e45_a11",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.01911163330078,
+   "ssim": 0.877129077911377,
+   "mask_iou": 0.9978765845298767,
+   "label_acc": 0.9952145218849182
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.771860122680664,
+   "ssim": 0.8689305782318115,
+   "mask_iou": 1.0,
+   "label_acc": 0.9975782036781311
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.154245376586914,
+   "ssim": 0.8846253752708435,
+   "mask_iou": 1.0,
+   "label_acc": 0.9968118071556091
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.186058044433594,
+   "ssim": 0.8627955317497253,
+   "mask_iou": 0.9995558857917786,
+   "label_acc": 0.9965686202049255
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.433937072753906,
+   "ssim": 0.8762408494949341,
+   "mask_iou": 0.9995558857917786,
+   "label_acc": 0.9961856603622437
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 25.795215606689453,
+   "ssim": 0.8551983833312988,
+   "mask_iou": 0.9997854828834534,
+   "label_acc": 0.9965665340423584
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.134166717529297,
+   "ssim": 0.8625909686088562,
+   "mask_iou": 0.9997854828834534,
+   "label_acc": 0.9970723390579224
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.369739532470703,
+   "ssim": 0.9100573062896729,
+   "mask_iou": 0.997747004032135,
+   "label_acc": 0.9944972395896912
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.244813919067383,
+   "ssim": 0.9188938140869141,
+   "mask_iou": 0.999049723148346,
+   "label_acc": 0.9960300326347351
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.252674102783203,
+   "ssim": 0.8841444849967957,
+   "mask_iou": 0.9999080300331116,
+   "label_acc": 0.9966738224029541
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.081932067871094,
+   "ssim": 0.8830374479293823,
+   "mask_iou": 0.9999080300331116,
+   "label_acc": 0.9966891407966614
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.54031753540039,
+   "ssim": 0.9042639136314392,
+   "mask_iou": 0.9998008608818054,
+   "label_acc": 0.9966758489608765
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.797931671142578,
+   "ssim": 0.8998665809631348,
+   "mask_iou": 0.9998008608818054,
+   "label_acc": 0.9970128536224365
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.383495330810547,
+   "ssim": 0.8985306024551392,
+   "mask_iou": 0.9999693632125854,
+   "label_acc": 0.9973635673522949
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.241331100463867,
+   "ssim": 0.9136907458305359,
+   "mask_iou": 0.9999693632125854,
+   "label_acc": 0.9972409605979919
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.68498420715332,
+   "ssim": 0.8965421915054321,
+   "mask_iou": 0.9999694228172302,
+   "label_acc": 0.9970632195472717
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.687469482421875,
+   "ssim": 0.9187498092651367,
+   "mask_iou": 0.9998008012771606,
+   "label_acc": 0.9968129992485046
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a08",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.597103118896484,
+   "ssim": 0.8856393694877625,
+   "mask_iou": 0.9999233484268188,
+   "label_acc": 0.9974862337112427
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a08",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.623306274414062,
+   "ssim": 0.8962380290031433,
+   "mask_iou": 0.9999233484268188,
+   "label_acc": 0.9969344139099121
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a09",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.266204833984375,
+   "ssim": 0.8874355554580688,
+   "mask_iou": 0.9997701048851013,
+   "label_acc": 0.9972409605979919
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a09",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.126495361328125,
+   "ssim": 0.8963251113891602,
+   "mask_iou": 0.9998314380645752,
+   "label_acc": 0.9965512156486511
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a10",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.663103103637695,
+   "ssim": 0.8670026659965515,
+   "mask_iou": 0.9997701048851013,
+   "label_acc": 0.9970570206642151
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a10",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.711505889892578,
+   "ssim": 0.875942587852478,
+   "mask_iou": 0.9997701048851013,
+   "label_acc": 0.9964898824691772
+  },
+  {
+   "config": 8,
+   "camera": "wide_e70_a11",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.5604248046875,
+   "ssim": 0.8612927198410034,
+   "mask_iou": 0.9997551441192627,
+   "label_acc": 0.9968620538711548
+  },
+  {
+   "config": 9,
+   "camera": "wide_e70_a11",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.089923858642578,
+   "ssim": 0.8774453997612,
+   "mask_iou": 0.9996783137321472,
+   "label_acc": 0.9965678453445435
+  },
+  {
+   "config": 8,
+   "camera": "close_e30_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.857421875,
+   "ssim": 0.8368643522262573,
+   "mask_iou": 0.998975932598114,
+   "label_acc": 0.9986061453819275
+  },
+  {
+   "config": 9,
+   "camera": "close_e30_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.33234977722168,
+   "ssim": 0.8537589907646179,
+   "mask_iou": 0.9979685544967651,
+   "label_acc": 0.9937717318534851
+  },
+  {
+   "config": 8,
+   "camera": "close_e30_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 25.928468704223633,
+   "ssim": 0.8333660364151001,
+   "mask_iou": 0.9987237453460693,
+   "label_acc": 0.9976202845573425
+  },
+  {
+   "config": 9,
+   "camera": "close_e30_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 25.896114349365234,
+   "ssim": 0.8511663675308228,
+   "mask_iou": 0.9975691437721252,
+   "label_acc": 0.9925339221954346
+  },
+  {
+   "config": 8,
+   "camera": "close_e30_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 31.01179313659668,
+   "ssim": 0.9117237329483032,
+   "mask_iou": 0.9990695118904114,
+   "label_acc": 0.9981188178062439
+  },
+  {
+   "config": 9,
+   "camera": "close_e30_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.7247371673584,
+   "ssim": 0.9012494087219238,
+   "mask_iou": 0.9974737763404846,
+   "label_acc": 0.9923668503761292
+  },
+  {
+   "config": 8,
+   "camera": "close_e30_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.038118362426758,
+   "ssim": 0.8513171672821045,
+   "mask_iou": 0.9992223381996155,
+   "label_acc": 0.9993299841880798
+  },
+  {
+   "config": 9,
+   "camera": "close_e30_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.33098602294922,
+   "ssim": 0.8721381425857544,
+   "mask_iou": 0.9985544681549072,
+   "label_acc": 0.9956989288330078
+  },
+  {
+   "config": 8,
+   "camera": "close_e30_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 31.4024658203125,
+   "ssim": 0.9019759893417358,
+   "mask_iou": 0.998508632183075,
+   "label_acc": 0.9994485378265381
+  },
+  {
+   "config": 9,
+   "camera": "close_e30_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.057401657104492,
+   "ssim": 0.9106108546257019,
+   "mask_iou": 0.9971106648445129,
+   "label_acc": 0.9971256256103516
+  },
+  {
+   "config": 8,
+   "camera": "close_e30_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.354949951171875,
+   "ssim": 0.8494755029678345,
+   "mask_iou": 0.999459445476532,
+   "label_acc": 0.9988754987716675
+  },
+  {
+   "config": 9,
+   "camera": "close_e30_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.91016960144043,
+   "ssim": 0.8769943714141846,
+   "mask_iou": 0.9973999261856079,
+   "label_acc": 0.9944533705711365
+  },
+  {
+   "config": 8,
+   "camera": "close_e30_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 31.751121520996094,
+   "ssim": 0.907622218132019,
+   "mask_iou": 0.9978219270706177,
+   "label_acc": 0.996930718421936
+  },
+  {
+   "config": 9,
+   "camera": "close_e30_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.0820369720459,
+   "ssim": 0.8989921808242798,
+   "mask_iou": 0.9965634346008301,
+   "label_acc": 0.993213415145874
+  },
+  {
+   "config": 8,
+   "camera": "close_e30_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.974437713623047,
+   "ssim": 0.872511088848114,
+   "mask_iou": 0.9987160563468933,
+   "label_acc": 0.997722864151001
+  },
+  {
+   "config": 9,
+   "camera": "close_e30_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.46249008178711,
+   "ssim": 0.8798412084579468,
+   "mask_iou": 0.9971884489059448,
+   "label_acc": 0.9933521151542664
+  },
+  {
+   "config": 8,
+   "camera": "close_e60_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.31989097595215,
+   "ssim": 0.9426978826522827,
+   "mask_iou": 1.0,
+   "label_acc": 0.9992523193359375
+  },
+  {
+   "config": 9,
+   "camera": "close_e60_a00",
+   "policy": false,
+   "size": 256,
+   "psnr": 28.287593841552734,
+   "ssim": 0.9221910238265991,
+   "mask_iou": 1.0,
+   "label_acc": 0.9914703369140625
+  },
+  {
+   "config": 8,
+   "camera": "close_e60_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.45697021484375,
+   "ssim": 0.941626250743866,
+   "mask_iou": 1.0,
+   "label_acc": 0.9993438720703125
+  },
+  {
+   "config": 9,
+   "camera": "close_e60_a01",
+   "policy": false,
+   "size": 256,
+   "psnr": 27.4190616607666,
+   "ssim": 0.9173700213432312,
+   "mask_iou": 1.0,
+   "label_acc": 0.990966796875
+  },
+  {
+   "config": 8,
+   "camera": "close_e60_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 29.96074676513672,
+   "ssim": 0.9228014945983887,
+   "mask_iou": 1.0,
+   "label_acc": 0.999664306640625
+  },
+  {
+   "config": 9,
+   "camera": "close_e60_a02",
+   "policy": false,
+   "size": 256,
+   "psnr": 24.595373153686523,
+   "ssim": 0.877827525138855,
+   "mask_iou": 1.0,
+   "label_acc": 0.989776611328125
+  },
+  {
+   "config": 8,
+   "camera": "close_e60_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 31.99509620666504,
+   "ssim": 0.9460492134094238,
+   "mask_iou": 0.9988656640052795,
+   "label_acc": 0.9984824657440186
+  },
+  {
+   "config": 9,
+   "camera": "close_e60_a03",
+   "policy": false,
+   "size": 256,
+   "psnr": 25.239704132080078,
+   "ssim": 0.8917036056518555,
+   "mask_iou": 0.99897301197052,
+   "label_acc": 0.9939298629760742
+  },
+  {
+   "config": 8,
+   "camera": "close_e60_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 32.43121337890625,
+   "ssim": 0.9541375041007996,
+   "mask_iou": 0.9992766976356506,
+   "label_acc": 0.9983841180801392
+  },
+  {
+   "config": 9,
+   "camera": "close_e60_a04",
+   "policy": false,
+   "size": 256,
+   "psnr": 25.821924209594727,
+   "ssim": 0.9183109998703003,
+   "mask_iou": 1.0,
+   "label_acc": 0.9504547119140625
+  },
+  {
+   "config": 8,
+   "camera": "close_e60_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 32.15488815307617,
+   "ssim": 0.9448763728141785,
+   "mask_iou": 0.997547447681427,
+   "label_acc": 0.9973328113555908
+  },
+  {
+   "config": 9,
+   "camera": "close_e60_a05",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.590394973754883,
+   "ssim": 0.91750568151474,
+   "mask_iou": 0.9985437989234924,
+   "label_acc": 0.9925963282585144
+  },
+  {
+   "config": 8,
+   "camera": "close_e60_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.404470443725586,
+   "ssim": 0.9255086779594421,
+   "mask_iou": 0.9999847412109375,
+   "label_acc": 0.9998016357421875
+  },
+  {
+   "config": 9,
+   "camera": "close_e60_a06",
+   "policy": false,
+   "size": 256,
+   "psnr": 25.50955581665039,
+   "ssim": 0.8948137164115906,
+   "mask_iou": 0.9999847412109375,
+   "label_acc": 0.9932098388671875
+  },
+  {
+   "config": 8,
+   "camera": "close_e60_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 30.906532287597656,
+   "ssim": 0.9322623014450073,
+   "mask_iou": 1.0,
+   "label_acc": 0.9994659423828125
+  },
+  {
+   "config": 9,
+   "camera": "close_e60_a07",
+   "policy": false,
+   "size": 256,
+   "psnr": 26.76482391357422,
+   "ssim": 0.9012385606765747,
+   "mask_iou": 1.0,
+   "label_acc": 0.992156982421875
+  }
+ ]
+}

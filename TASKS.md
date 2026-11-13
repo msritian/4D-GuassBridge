@@ -102,7 +102,7 @@ Status legend: todo · in progress · blocked · done
   by R and the camera by the same R about the part origin gives the same image (checks SH-in-local-frame);
   (3) dense rasteriser vs gsplat on GPU: max abs diff < 1e-3 on a random scene.
 
-### B4 Articulated reconstruction — deps B2, B3 — Status: todo
+### B4 Articulated reconstruction — deps B2, B3 — owner: Amogh — Status: in progress (acceptance numbers pass for both tasks: base 30.8 / 31.8 dB, rings 28.3 / 28.6 dB, labels ≥ 99.2%; open: table floaters), see progress.md
 - `gs/recon.py` per §7.2 (init by back-projection per part, L1+SSIM+depth+label CE, DefaultStrategy with
   non-trainable `part_id`, optional pose refinement); `scripts/train_recon.py`.
 - Acceptance: StackCube asset model: held-out config PSNR ≥ 28 dB at base_camera (128²) and ≥ 26 dB at capture res;
