@@ -157,7 +157,7 @@ Updated as results come in. The PR merges when every **merge blocker** is ticked
 |---|---|---|---|---|
 | 1 | all | CI green on Linux (planner + simulator tests, which cannot run on a Mac; shared files changed: `trajectory.py`, `kinematics.py`, `CLAUDE.md`) | yes | **done**: PR #10 CI run 43496909955, 86 passed, 5 skipped (GPU), 3m38s |
 | 2 | C3 | Batch 256 in bf16 fits a 40 GB GPU (TASKS.md C3 acceptance) | yes | **done**: CHTC 8547380 on A100-SXM4-40GB: bf16 batch 256 peak **26.8 GB** (< 40 GB), 0.31 s/step; fp32 does not fit (OOM). 150k steps ≈ 13 h on this card (plan said 6–8 h) |
-| 3 | C4 | GPU trial: full model, bf16, `pytorch_kinematics` install on the node, at least one real CHTC pause → restart → resume, validation metrics, `final_ema.pt` | yes | retry: CHTC 8547386 crashed at start-up: macOS tar stored hidden `._*.npz` metadata files that Linux unpacked as episodes (fixed: `COPYFILE_DISABLE=1` in `chtc/pack.sh` + `trajectory.episode_files` skips `._*`); resubmitted |
+| 3 | C4 | GPU trial: full model, bf16, `pytorch_kinematics` install on the node, at least one real CHTC pause → restart → resume, validation metrics, `final_ema.pt` | yes | **done**: CHTC 8549894 (8547386 crashed first: macOS tar's hidden `._*.npz` files; fixed in `chtc/pack.sh` + `trajectory.episode_files`). Full model, bf16, A100; **two real pause → restart → resume cycles** (2143 → 2755 → 3000, exit 85, 85, 0); validation incl. C5 metrics on the node; `final_ema.pt` written. Details: C4 section |
 | 4 | C3 | Overfit PickCube (1 object, padded slots on real data) | no (extra check) | running: CHTC 8547379.0 |
 | 5 | C3 | Overfit StackCube with all goal modes; object-only evaluation on real data | no (extra check) | running: CHTC 8547379.1 (step 1k: obj 17.0 mm full / 17.9 mm objects, endpoints exact) |
 | 6 | C3 | Overfit StackCube, full goal (TASKS.md C3 acceptance) | yes | **done**: CHTC 8539260, 6 mm / 0.9° / 0.026 rad to nearest episode, endpoints exact |
@@ -187,6 +187,18 @@ bash chtc/pack.sh <train episodes dir> <val episodes dir> <bundle dir>    # then
 * Config: plain YAML + strict overrides (decision, CLAUDE.md §1); floats in YAML need a dot (2.0e-4), overrides accept 1e-4.
 * Bugs found by the tests: initial weights were unseeded (runs not reproducible), PyYAML read `1e-3` as text, a log
   window was dropped on pause, a second `--set` replaced the first.
+
+**GPU trial (CHTC 8549894, 2026-11-13; StackCube dev, train = val = 12 episodes, 3000 steps, 12-min segments):**
+| step | train loss | lr | val loss (EMA) | val samples (object goal, EMA): minADE / cov@3cm / prec@3cm / APD | jerk (m²/s⁶) |
+|---|---|---|---|---|---|
+| 1000 | 0.024 | 1.6e-4 | 0.875 | 41.4 cm / 0.00 / 0.00 / 46.2 cm | 4.2e7 |
+| 2000 | 0.017 | 5.2e-5 | 0.136 | 8.6 cm / 0.00 / 0.00 / 8.8 cm | 2.8e6 |
+| 3000 | 0.014 | 2e-7 | 0.049 | 2.9 cm / 0.58 / 0.29 / 3.5 cm | 3.6e5 |
+Endpoints exact throughout. Findings for the real run: (1) samples are jittery: jerk 3.6e5 vs 2–8 for planner motions
+(the C6 "jerk > 99th percentile of training" filter would reject everything); recheck after full training, else
+smooth / more sampling steps. (2) Speed depends on the card: ~180 steps/min (segment 1) vs ~50 (segment 2).
+(3) Checkpoints are 488 MB (model + EMA + optimiser): ~1 GB per run; write runs to /staging (home quota 40 GB).
+Results: `/staging/s/smittal39/gaussbridge/trial_stackcube_dev.tar.gz`.
 
 ## C5 — metrics + evaluation harness (Shivam)
 
