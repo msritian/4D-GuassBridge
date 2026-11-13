@@ -11,7 +11,7 @@ from gaussbridge.model.dataset import box_shape_points
 from gaussbridge.model.dit import MotionDiT
 from gaussbridge.model.encoders import PointSetEncoder
 
-SMALL = dict(d_model=64, depth=2, heads=4)
+SMALL = {"d_model": 64, "depth": 2, "heads": 4}
 B, N, E, F = 3, 128, 4, 10
 
 
@@ -32,8 +32,8 @@ def make_inputs(seed=0, n_objects=2):
     x_known = torch.randn(B, N, E, F, generator=g) * known[..., None]
     x_t = torch.where(known[..., None], x_known, torch.randn(B, N, E, F, generator=g)) * ent_mask[:, None, :, None]
     shapes = torch.stack([box_shape_points(rgb=(1.0, 0, 0), seed=k) for k in range(E - 1)]).expand(B, -1, -1, -1)
-    return dict(x_t=x_t, dur_t=torch.randn(B, generator=g), tau=torch.rand(B, generator=g), x_known=x_known,
-                known=known, ent_mask=ent_mask, shapes=shapes.clone())
+    return {"x_t": x_t, "dur_t": torch.randn(B, generator=g), "tau": torch.rand(B, generator=g),
+            "x_known": x_known, "known": known, "ent_mask": ent_mask, "shapes": shapes.clone()}
 
 
 @torch.no_grad()

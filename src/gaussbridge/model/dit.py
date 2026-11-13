@@ -109,8 +109,8 @@ class MotionDiT(nn.Module):
     def __init__(self, n_steps=N_STEPS, n_entities=1 + K_MAX, n_features=NUM_FEATURES, d_model=384, depth=8,
                  heads=6, mlp_ratio=4):
         super().__init__()
-        self.config = dict(n_steps=n_steps, n_entities=n_entities, n_features=n_features, d_model=d_model,
-                           depth=depth, heads=heads, mlp_ratio=mlp_ratio)
+        self.config = {"n_steps": n_steps, "n_entities": n_entities, "n_features": n_features, "d_model": d_model,
+                       "depth": depth, "heads": heads, "mlp_ratio": mlp_ratio}
         d = d_model
         self.n_steps, self.n_entities, self.n_features = n_steps, n_entities, n_features
 
