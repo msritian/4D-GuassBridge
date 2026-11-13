@@ -1,0 +1,202 @@
+{
+ "0": {
+  "seed": 0,
+  "ref_idx": 0,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 3,
+   "reach_h": 0.04888506996347092,
+   "lift_h": 0.06573629335106726,
+   "place_h": 0.0,
+   "via": [
+    0.06604089236443549,
+    0.017061724122748784,
+    0.058359724878719876
+   ],
+   "speed": 0.6718124957327114,
+   "rrt_transport": false
+  },
+  "num_steps": 170
+ },
+ "1": {
+  "seed": 0,
+  "ref_idx": 1,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 3,
+   "reach_h": 0.06899966351443584,
+   "lift_h": 0.1721271321648761,
+   "place_h": 0.0,
+   "via": null,
+   "speed": 0.7939060989360823,
+   "rrt_transport": true
+  },
+  "num_steps": 141
+ },
+ "2": {
+  "seed": 0,
+  "ref_idx": 2,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 3,
+   "reach_h": 0.05817064543955111,
+   "lift_h": 0.14418048887328724,
+   "place_h": 0.0,
+   "via": null,
+   "speed": 0.5634693504368049,
+   "rrt_transport": true
+  },
+  "num_steps": 164
+ },
+ "3": {
+  "seed": 0,
+  "ref_idx": 3,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 3,
+   "reach_h": 0.09022901057424564,
+   "lift_h": 0.10499247512725188,
+   "place_h": 0.0,
+   "via": null,
+   "speed": 0.7442449884767853,
+   "rrt_transport": false
+  },
+  "num_steps": 149
+ },
+ "4": {
+  "seed": 1,
+  "ref_idx": 0,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 1,
+   "reach_h": 0.09653245874281548,
+   "lift_h": 0.08018234578074872,
+   "place_h": 0.0,
+   "via": null,
+   "speed": 0.813851296910221,
+   "rrt_transport": false
+  },
+  "num_steps": 113
+ },
+ "5": {
+  "seed": 1,
+  "ref_idx": 1,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 3,
+   "reach_h": 0.07283271815519612,
+   "lift_h": 0.13106857238493833,
+   "place_h": 0.0,
+   "via": [
+    -0.07698177712149695,
+    -0.06772754737055432,
+    0.034992736522050656
+   ],
+   "speed": 0.8765487893507309,
+   "rrt_transport": false
+  },
+  "num_steps": 152
+ },
+ "6": {
+  "seed": 1,
+  "ref_idx": 2,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 3,
+   "reach_h": 0.06016173912810363,
+   "lift_h": 0.11879987811490691,
+   "place_h": 0.0,
+   "via": [
+    -0.07204001862530818,
+    -0.06512416943402975,
+    0.06999372125278602
+   ],
+   "speed": 0.730617464196329,
+   "rrt_transport": false
+  },
+  "num_steps": 169
+ },
+ "7": {
+  "seed": 1,
+  "ref_idx": 3,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 1,
+   "reach_h": 0.03956257404002121,
+   "lift_h": 0.12383364524703262,
+   "place_h": 0.0,
+   "via": null,
+   "speed": 0.6513270522389643,
+   "rrt_transport": false
+  },
+  "num_steps": 128
+ },
+ "8": {
+  "seed": 2,
+  "ref_idx": 0,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 3,
+   "reach_h": 0.050894380038988635,
+   "lift_h": 0.17399160368319927,
+   "place_h": 0.0,
+   "via": [
+    0.03656968428988713,
+    -0.04993582826134345,
+    0.004411730186645455
+   ],
+   "speed": 0.5374846839530191,
+   "rrt_transport": false
+  },
+  "num_steps": 179
+ },
+ "9": {
+  "seed": 2,
+  "ref_idx": 1,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 1,
+   "reach_h": 0.0898489851996718,
+   "lift_h": 0.08877214574232214,
+   "place_h": 0.0,
+   "via": null,
+   "speed": 0.42471892832405683,
+   "rrt_transport": false
+  },
+  "num_steps": 174
+ },
+ "10": {
+  "seed": 2,
+  "ref_idx": 2,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 2,
+   "reach_h": 0.08899277352427434,
+   "lift_h": 0.11326831831020578,
+   "place_h": 0.0,
+   "via": [
+    -0.03665536312036366,
+    0.005600821971079917,
+    0.04717871287523836
+   ],
+   "speed": 0.5875053630279676,
+   "rrt_transport": false
+  },
+  "num_steps": 213
+ },
+ "11": {
+  "seed": 2,
+  "ref_idx": 3,
+  "attempt": 0,
+  "knobs": {
+   "grasp_yaw_k": 3,
+   "reach_h": 0.0654956863281253,
+   "lift_h": 0.13538752430234552,
+   "place_h": 0.0,
+   "via": null,
+   "speed": 0.6932589849043599,
+   "rrt_transport": false
+  },
+  "num_steps": 126
+ }
+}
