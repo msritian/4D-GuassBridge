@@ -27,7 +27,8 @@ Status: todo · in progress · done · blocked
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
 | C3 Dataset + model | Shivam | in progress (2026-11-13): code done, overfit passed, memory check pending | `src/gaussbridge/model/{dataset,encoders,dit,flow,evaluate}.py`, `scripts/overfit_motion.py`, `scripts/check_memory.py`, `chtc/{overfit,check_memory}.{sub,sh}`, `tests/test_motion_*.py` | overfit on 10 real episodes: 6 mm / 0.9° / 0.026 rad to the nearest episode, endpoints exact; see C3 below |
 | C5 Metrics + harness | Shivam | in progress (2026-11-13): metrics, straight line, harness done; sanity passed | `src/gaussbridge/eval/{metrics,baselines}.py`, `scripts/eval_motion.py`, `tests/test_eval_metrics.py`, `results/c5/` | refs vs themselves: coverage 1, precision 1, minADE 0; penetration waits for C6 spheres, replay for A3; see C5 below |
-| C4, C6–C9 | Shivam | todo | — | |
+| C4 Training pipeline | Shivam | in progress (2026-11-13): pipeline done, CHTC trial running; real run needs A4 | `src/gaussbridge/model/train.py`, `scripts/train_motion.py`, `configs/train/stackcube_v1.yaml`, `chtc/{train.sub,train.sh,pack.sh}`, `tests/test_motion_train.py` | exact resume verified (CPU); see C4 below |
+| C6–C9 | Shivam | todo | — | |
 
 ## A1 — randomised planner demos
 
@@ -147,6 +148,25 @@ recipe (constant lr, no EMA); C4 candidates: lr decay + EMA, and rescaling joint
 
 **CHTC lessons** (CLAUDE.md §3.5): Blackwell GPUs fail with torch 2.5.1 → request capability 8.0–9.0; job scripts
 always return logs; one folder per job type under `~/gaussbridge/`.
+
+## C4 — training pipeline (Shivam)
+
+```bash
+python scripts/train_motion.py configs/train/stackcube_v1.yaml --run runs/<name> [--set optim.steps=1000 ...] [--max-minutes 120]
+bash chtc/pack.sh <train episodes dir> <val episodes dir> <bundle dir>    # then condor_submit chtc/train.sub
+```
+* Recipe (CLAUDE.md §8.2) in `model/train.py::Trainer`: all goal modes + endpoint noise, AdamW 2e-4 / wd 0.01, 2k warm-up +
+  cosine, grad clip 1.0, bf16 on GPU, EMA 0.999 (validation and `final_ema.pt` use it), checkpoints every 2k steps
+  (atomic, last 2 kept). Validation: EMA loss over the val set; every 10k steps 16 samples per val start (object-only
+  goal) scored with the C5 metrics (also coverage/precision @1 cm).
+* **Exact resume:** all randomness of step n comes from a generator seeded by (seed, n); test: 5 steps + stop + new
+  Trainer + resume == 12 uninterrupted steps, bit-identical weights/EMA/optimiser on CPU.
+* **CHTC:** `chtc/train.sub` uses self-checkpointing: `--max-minutes` → checkpoint + exit 85 → HTCondor saves the run
+  directory and restarts the job (maybe elsewhere, `+is_resumable`), which resumes. Public PyTorch image +
+  `pip install pytorch_kinematics==0.7.6` + the two Panda URDFs shipped in the bundle (`GB_URDF_DIR`, kinematics.py).
+* Config: plain YAML + strict overrides (decision, CLAUDE.md §1); floats in YAML need a dot (2.0e-4), overrides accept 1e-4.
+* Bugs found by the tests: initial weights were unseeded (runs not reproducible), PyYAML read `1e-3` as text, a log
+  window was dropped on pause, a second `--set` replaced the first.
 
 ## C5 — metrics + evaluation harness (Shivam)
 

@@ -50,7 +50,10 @@ ManiSkill's **Diffusion Policy** baseline trained on real demos vs. real + our g
 3. Small, tested steps. Every task in `TASKS.md` has an acceptance test; a task is done only when it passes.
 4. CPU-first where possible: everything except Gaussian rendering/training and model training runs on a laptop or
    CHTC CPU node (ManiSkill runs headless on CPU with software Vulkan, §3.3).
-5. Reproducibility: Hydra configs, fixed seeds, git commit hash saved with every artifact, W&B logging.
+5. Reproducibility: config files, fixed seeds, git commit hash saved with every artifact, W&B logging.
+   **Decision 2026-11-13 (Shivam):** plain YAML configs (`configs/`) with strict `key=value` overrides
+   (`model/train.py::load_config`) instead of Hydra (no extra dependency in CHTC jobs); W&B optional, off until the
+   team project exists; every run logs to `<run>/log.jsonl` and saves its resolved `config.yaml`.
 6. Keep `TASKS.md` current: owner, status, link to PR/commit, measured numbers.
 7. Don't rewrite or delete teammates' work without asking in the task's thread.
 
@@ -752,7 +755,7 @@ generation", "Gaussian splatting demonstration synthesis", "trajectory diffusion
 ## 15. Open decisions (owner decides, then record here)
 * [ ] Confirm course deadline and report format (CVPR template, as for the proposal?) — Shivam, by Nov 9.
 * [ ] Group staging directory requested from CHTC — Aditya, by Nov 9.
-* [ ] W&B team project name — Shivam.
+* [ ] W&B team project name — Shivam. (Training works without it: file logs; switch on via `wandb.enabled`.)
 * [ ] Robot end in conditioning for the downstream data: object-only goal (default) vs full goal.
 * [ ] Real-world stretch go/no-go at G4 (needs a tabletop, phone, AprilTag; no robot needed: objects-only mode
       requires training a variant with the robot token masked).

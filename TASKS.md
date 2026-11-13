@@ -148,7 +148,7 @@ Status legend: todo · in progress · blocked · done
 - Acceptance: overfit 10 episodes (loss → ~0); sampled endpoints equal conditioning exactly (max abs diff 0);
   forward pass on batch 256 fits a 40 GB GPU in bf16.
 
-### C4 Training pipeline — deps C3, A4, S0.3 — Status: todo
+### C4 Training pipeline — deps C3, A4, S0.3 — owner: Shivam — Status: in progress (pipeline built + tested; waiting for A4 data for the real run)
 - `scripts/train_motion.py` (Hydra; AdamW, cosine, EMA, bf16, resumable checkpoints every 2k steps, W&B); CHTC job.
 - Acceptance: StackCube v1 model trained 150k steps; val loss curve; 16 sampled trajectories visualised (matplotlib
   3D TCP/object tracks + one Gaussian-rendered video once B5 exists).
