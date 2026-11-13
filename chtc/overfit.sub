@@ -1,0 +1,36 @@
+# C3 overfit check on one CHTC GPU (CLAUDE.md §3.5). Short job: ~10k steps of a 30 M model on 10 episodes.
+#
+# On your laptop (repo root):
+#   git archive -o gb_code.tar.gz HEAD src scripts pyproject.toml chtc
+#   python scripts/extract_episodes.py --split dev --out data/episodes/StackCube-v1 artifacts/raw/StackCube-v1/dev.h5
+#   cp data/episodes/StackCube-v1/dev.tar episodes_dev.tar
+#   scp gb_code.tar.gz episodes_dev.tar chtc/overfit.sub chtc/overfit.sh <netid>@<submit node>:~/gb_overfit/
+# On the submit node:
+#   cd ~/gb_overfit && mkdir -p logs && condor_submit overfit.sub
+#   condor_q ; condor_tail -f <job id>          (watch progress; ssh into GPU jobs is disabled)
+# Afterwards: overfit_out.tar.gz appears in ~/gb_overfit (log.jsonl, report.json, checkpoint.pt).
+#
+# Inputs are < 1 MB, so they go straight from /home (no staging needed).
+# The public PyTorch image has the same torch as the project pin; never use a "latest" tag (CHTC caches images).
+
+universe                = container
+container_image         = docker://pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+executable              = overfit.sh
+arguments               = --steps 10000 --batch 64 --eval-every 1000
+transfer_input_files    = gb_code.tar.gz, episodes_dev.tar
+transfer_output_files   = overfit_out.tar.gz
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+
+request_gpus            = 1
++WantGPULab             = true
++GPUJobLength           = "short"
+gpus_minimum_memory     = 16000
+request_cpus            = 4
+request_memory          = 16GB
+request_disk            = 10GB
+
+log    = logs/overfit_$(Cluster).log
+output = logs/overfit_$(Cluster).out
+error  = logs/overfit_$(Cluster).err
+queue 1
