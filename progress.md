@@ -278,6 +278,8 @@ $py = "$env:USERPROFILE\anaconda3\envs\gaussbridge\python.exe"
 
 ## Findings that affect everyone
 
+* **CHTC Blackwell GPUs (RTX PRO 6000, GB10) fail with torch 2.5.1** ("no kernel image is available"). Add
+  `gpus_minimum_capability = 8.0` and `gpus_maximum_capability = 9.0` to every GPU submit file. CLAUDE.md §3.5.
 * `mplib` (ManiSkill's planner backend) only has Linux x86_64 wheels. On a Mac `pip install mani_skill` works
   (mplib is Linux-only in its requirements) but the motion planner cannot run. Use `docker/Dockerfile.cpu`.
 * Debian bookworm's software Vulkan (Mesa 22.3) is rejected by SAPIEN 3.0.3 ("Failed to find a supported physical

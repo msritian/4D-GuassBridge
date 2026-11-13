@@ -1,0 +1,26 @@
+# C3 acceptance: batch 256 in bf16 fits a 40 GB GPU (TASKS.md C3). A few minutes on one GPU.
+# Same setup as chtc/overfit.sub (public PyTorch image, code from `git archive`); asks for a 40 GB-class GPU so the
+# check runs on the budget it is about. Usage on the submit node: cd ~/gb_overfit && condor_submit check_memory.sub
+universe                = container
+container_image         = docker://pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+executable              = check_memory.sh
+transfer_input_files    = gb_code.tar.gz
+transfer_output_files   = memory.json
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+
+request_gpus            = 1
++WantGPULab             = true
++GPUJobLength           = "short"
+gpus_minimum_memory     = 40G
+# torch 2.5.1 has no Blackwell (capability 12.x) kernels, see chtc/overfit.sub
+gpus_minimum_capability = 8.0
+gpus_maximum_capability = 9.0
+request_cpus            = 2
+request_memory          = 16GB
+request_disk            = 5GB
+
+log    = logs/check_memory_$(Cluster).log
+output = logs/check_memory_$(Cluster).out
+error  = logs/check_memory_$(Cluster).err
+queue 1

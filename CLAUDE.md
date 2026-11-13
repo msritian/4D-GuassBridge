@@ -164,6 +164,13 @@ Verified from CHTC docs (2026):
 * Per-user GPU limits: short ≤ 2/3 of GPU Lab GPUs, medium ≤ 1/3, long ≤ 4 GPUs. Three accounts = 3× quota.
 * GPU Lab (open capacity): H200 141 GB, H100 80 GB, A100 80/40 GB, L40/L40S 44 GB, RTX PRO 6000 94 GB, … L40S are
   plentiful and fine for rendering and model training.
+* **Blackwell GPUs do not work with our torch pin (verified 2026-11-13, job 8539255):** torch 2.5.1 (cu124) has
+  kernels for sm_50–sm_90 only, so RTX PRO 6000 Blackwell and GB10 (capability 12.x) fail with "CUDA error: no kernel
+  image is available for execution on the device". Every GPU submit file needs `gpus_minimum_capability = 8.0` and
+  `gpus_maximum_capability = 9.0` (A100, A30, A40, L40/L40S, H100, H200; ~100 of them idle at the time). Upgrading
+  torch to a cu128 build would add Blackwell but is a team decision (gsplat build, ManiSkill pin).
+* For jobs that only need torch + numpy (motion model training) the public image
+  `pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime` works; see `chtc/overfit.sub`.
 * `condor_ssh_to_job` is **disabled on shared GPU machines** (since 2026-04-22): debug with
   `condor_submit -i job.sub` (interactive) and watch logs with `condor_tail`.
 * Data: `/staging/<letter>/<netid>` (default 100 GB / 1000 files). Input 1–30 GB:
