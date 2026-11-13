@@ -4,6 +4,9 @@
 # Run from the repo root on a machine with ManiSkill installed (only to copy its two URDF files). Uses committed code
 # only (git archive HEAD), so commit first.
 set -euo pipefail
+# macOS tar otherwise adds a hidden "._<name>" metadata file per file; on Linux they become real "._*.npz" files that
+# crash episode loading (CHTC job 8547386). No effect on Linux.
+export COPYFILE_DISABLE=1
 train=$1
 val=$2
 out=$3

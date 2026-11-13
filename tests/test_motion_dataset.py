@@ -179,3 +179,13 @@ def test_make_batch_matches_getitem_and_is_reproducible(stack_episodes):
     again = ds.make_batch(idx, torch.Generator().manual_seed(1))
     assert all(torch.equal(b[key], again[key]) for key in b)               # same seed -> same batch
     assert b["shapes"].shape == (4000, K_MAX, 512, 6)
+
+
+def test_episode_files_skip_macos_metadata(tmp_path):
+    """macOS tar adds '._<name>' files that also end in .npz; listing episodes must skip them."""
+    from gaussbridge.trajectory import episode_files
+
+    fake_episode(140).save(tmp_path / "00000_00.npz")
+    (tmp_path / "._00000_00.npz").write_bytes(b"\x00\x05\x16\x07 mac metadata")
+    (tmp_path / "notes.txt").write_text("x")
+    assert [f.name for f in episode_files(tmp_path)] == ["00000_00.npz"]

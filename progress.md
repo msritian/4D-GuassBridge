@@ -156,8 +156,8 @@ Updated as results come in. The PR merges when every **merge blocker** is ticked
 | # | Task | Item | Merge blocker? | Status / evidence |
 |---|---|---|---|---|
 | 1 | all | CI green on Linux (planner + simulator tests, which cannot run on a Mac; shared files changed: `trajectory.py`, `kinematics.py`, `CLAUDE.md`) | yes | **done**: PR #10 CI run 43496909955, 86 passed, 5 skipped (GPU), 3m38s |
-| 2 | C3 | Batch 256 in bf16 fits a 40 GB GPU (TASKS.md C3 acceptance) | yes | todo: CHTC 8547380 queued (evicted once) |
-| 3 | C4 | GPU trial: full model, bf16, `pytorch_kinematics` install on the node, at least one real CHTC pause → restart → resume, validation metrics, `final_ema.pt` | yes | todo: CHTC 8547386 queued |
+| 2 | C3 | Batch 256 in bf16 fits a 40 GB GPU (TASKS.md C3 acceptance) | yes | **done**: CHTC 8547380 on A100-SXM4-40GB: bf16 batch 256 peak **26.8 GB** (< 40 GB), 0.31 s/step; fp32 does not fit (OOM). 150k steps ≈ 13 h on this card (plan said 6–8 h) |
+| 3 | C4 | GPU trial: full model, bf16, `pytorch_kinematics` install on the node, at least one real CHTC pause → restart → resume, validation metrics, `final_ema.pt` | yes | retry: CHTC 8547386 crashed at start-up: macOS tar stored hidden `._*.npz` metadata files that Linux unpacked as episodes (fixed: `COPYFILE_DISABLE=1` in `chtc/pack.sh` + `trajectory.episode_files` skips `._*`); resubmitted |
 | 4 | C3 | Overfit PickCube (1 object, padded slots on real data) | no (extra check) | running: CHTC 8547379.0 |
 | 5 | C3 | Overfit StackCube with all goal modes; object-only evaluation on real data | no (extra check) | running: CHTC 8547379.1 (step 1k: obj 17.0 mm full / 17.9 mm objects, endpoints exact) |
 | 6 | C3 | Overfit StackCube, full goal (TASKS.md C3 acceptance) | yes | **done**: CHTC 8539260, 6 mm / 0.9° / 0.026 rad to nearest episode, endpoints exact |
