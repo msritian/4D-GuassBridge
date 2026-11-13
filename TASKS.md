@@ -95,7 +95,7 @@ Status legend: todo · in progress · blocked · done
   configs; save as torch files to staging.
 - Acceptance: a contact sheet image of 4 configs × 4 views; every visual robot link appears in ≥ 20 views.
 
-### B3 PartSplats + composition — deps C1 — Status: todo
+### B3 PartSplats + composition — deps C1 — owner: Amogh — Status: done (2026-11-12), dense vs gsplat 2.3e-6, see progress.md
 - `gs/splats.py`: storage (§7.1), `world(part_T)`, local-frame SH colours (§7.3), save/load/subset/merge,
   `points_for_shape_encoder`; `gs/raster.py` (gsplat on CUDA; dense PyTorch rasteriser for CPU tests).
 - Acceptance: CPU tests: (1) identity poses render identical to gsplat-style direct rendering; (2) rotating a part

@@ -24,8 +24,10 @@ def quat_to_matrix(q):
 def matrix_to_quat(R):
     """Unit quaternion with w >= 0. Stable for all angles: builds q from its largest component (as pytorch3d)."""
     m00, m01, m02, m10, m11, m12, m20, m21, m22 = R.flatten(-2).unbind(-1)
-    q_abs = torch.stack([1 + m00 + m11 + m22, 1 + m00 - m11 - m22,
-                         1 - m00 + m11 - m22, 1 - m00 - m11 + m22], -1).clamp_min(0).sqrt()  # 2|q_i|
+    q_sq = torch.stack([1 + m00 + m11 + m22, 1 + m00 - m11 - m22,
+                        1 - m00 + m11 - m22, 1 - m00 - m11 + m22], -1)
+    pos = q_sq > 0  # sqrt only of positive entries: sqrt(0) has an infinite gradient (NaN at identity)
+    q_abs = torch.zeros_like(q_sq).masked_scatter(pos, q_sq[pos].sqrt())  # 2|q_i|
     cands = torch.stack([
         torch.stack([q_abs[..., 0] ** 2, m21 - m12, m02 - m20, m10 - m01], -1),
         torch.stack([m21 - m12, q_abs[..., 1] ** 2, m10 + m01, m02 + m20], -1),
@@ -117,6 +119,12 @@ def sapien_pose_to_viewmat(T_world_cam):
     C = torch.eye(4, dtype=T_world_cam.dtype, device=T_world_cam.device)
     C[:3, :3] = R_CV_FROM_SAPIEN.to(T_world_cam).T
     return se3_inverse(T_world_cam @ C)
+
+
+def viewmat_to_campos(viewmat):
+    """Camera centre in world [..., 3] from a world->camera viewmat [..., 4, 4]: -R^T t."""
+    R, t = viewmat[..., :3, :3], viewmat[..., :3, 3:]
+    return -(R.transpose(-1, -2) @ t).squeeze(-1)
 
 
 def look_at_viewmat(eye, target, up=(0.0, 0.0, 1.0)):

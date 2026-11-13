@@ -70,3 +70,15 @@ def test_transform_gaussians_rotates_covariance():
     R = T[:3, :3]
     torch.testing.assert_close(m_w, means @ R.T + T[:3, 3])
     torch.testing.assert_close(cov(q_w), R @ cov(quats) @ R.T)  # catches a wrong quaternion product order
+
+
+def test_viewmat_to_campos():
+    eye = torch.tensor([[0.3, -0.2, 0.6], [-1.0, 0.5, 0.2]])
+    V = G.look_at_viewmat(eye, torch.tensor([[-0.1, 0.0, 0.1], [0.0, 0.0, 0.0]]))
+    torch.testing.assert_close(G.viewmat_to_campos(V), eye)
+
+
+def test_matrix_to_quat_has_finite_gradients_at_identity():
+    R = torch.eye(3, requires_grad=True)
+    G.matrix_to_quat(R).sum().backward()
+    assert torch.isfinite(R.grad).all()

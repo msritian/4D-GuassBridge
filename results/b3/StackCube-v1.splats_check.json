@@ -1,0 +1,86 @@
+{
+ "task": "StackCube-v1",
+ "init_config": 0,
+ "num_gaussians": 255981,
+ "counts": {
+  "panda_link0": 20000,
+  "panda_link1": 20000,
+  "panda_link2": 20000,
+  "panda_link3": 20000,
+  "panda_link4": 20000,
+  "panda_link5": 20000,
+  "panda_link6": 20000,
+  "panda_link7": 20000,
+  "panda_link8": 0,
+  "panda_hand": 20000,
+  "panda_hand_tcp": 0,
+  "panda_leftfinger": 2722,
+  "panda_rightfinger": 3240,
+  "camera_base_link": 0,
+  "camera_link": 9281,
+  "table-workspace": 20000,
+  "ground": 20000,
+  "cubeA": 11139,
+  "cubeB": 9599
+ },
+ "color_mode": "sh",
+ "opacity": 0.9,
+ "views": [
+  {
+   "config": 0,
+   "split": "train",
+   "camera": "base_camera",
+   "valid": true,
+   "mask_iou": 0.79193115234375,
+   "label_acc": 0.9338728189468384,
+   "psnr": 12.810810089111328
+  },
+  {
+   "config": 0,
+   "split": "train",
+   "camera": "hand_camera",
+   "valid": true,
+   "mask_iou": 0.99993896484375,
+   "label_acc": 0.9152169823646545,
+   "psnr": 18.667680740356445
+  },
+  {
+   "config": 8,
+   "split": "heldout",
+   "camera": "base_camera",
+   "valid": true,
+   "mask_iou": 0.77166748046875,
+   "label_acc": 0.9443961381912231,
+   "psnr": 12.661334037780762
+  },
+  {
+   "config": 8,
+   "split": "heldout",
+   "camera": "hand_camera",
+   "valid": true,
+   "mask_iou": 0.96807861328125,
+   "label_acc": 0.8956559896469116,
+   "psnr": 17.497404098510742
+  },
+  {
+   "config": 9,
+   "split": "heldout",
+   "camera": "base_camera",
+   "valid": true,
+   "mask_iou": 0.77362060546875,
+   "label_acc": 0.928205132484436,
+   "psnr": 12.547821998596191
+  },
+  {
+   "config": 9,
+   "split": "heldout",
+   "camera": "hand_camera",
+   "valid": true,
+   "mask_iou": 0.9996337890625,
+   "label_acc": 0.9095127582550049,
+   "psnr": 18.813583374023438
+  }
+ ],
+ "git": "b6504199b2eb0abe5a0e96581f2f0ec51d903d1a",
+ "note": "no optimisation; colours are raw back-projected init, geometry must line up"
+}

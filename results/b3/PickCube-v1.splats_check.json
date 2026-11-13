@@ -1,0 +1,58 @@
+{
+ "task": "PickCube-v1",
+ "init_config": 0,
+ "num_gaussians": 235598,
+ "counts": {
+  "panda_link0": 20000,
+  "panda_link1": 20000,
+  "panda_link2": 20000,
+  "panda_link3": 20000,
+  "panda_link4": 20000,
+  "panda_link5": 20000,
+  "panda_link6": 20000,
+  "panda_link7": 20000,
+  "panda_link8": 0,
+  "panda_hand": 20000,
+  "panda_hand_tcp": 0,
+  "panda_leftfinger": 1735,
+  "panda_leftfinger_pad": 0,
+  "panda_rightfinger": 2604,
+  "panda_rightfinger_pad": 0,
+  "table-workspace": 20000,
+  "ground": 20000,
+  "cube": 11259
+ },
+ "color_mode": "sh",
+ "opacity": 0.9,
+ "views": [
+  {
+   "config": 0,
+   "split": "train",
+   "camera": "base_camera",
+   "valid": true,
+   "mask_iou": 0.79180908203125,
+   "label_acc": 0.9410313963890076,
+   "psnr": 12.864458084106445
+  },
+  {
+   "config": 8,
+   "split": "heldout",
+   "camera": "base_camera",
+   "valid": true,
+   "mask_iou": 0.76812744140625,
+   "label_acc": 0.9490663409233093,
+   "psnr": 12.650264739990234
+  },
+  {
+   "config": 9,
+   "split": "heldout",
+   "camera": "base_camera",
+   "valid": true,
+   "mask_iou": 0.7734375,
+   "label_acc": 0.9273200631141663,
+   "psnr": 12.564119338989258
+  }
+ ],
+ "git": "b6504199b2eb0abe5a0e96581f2f0ec51d903d1a",
+ "note": "no optimisation; colours are raw back-projected init, geometry must line up"
+}
