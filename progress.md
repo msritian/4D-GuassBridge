@@ -16,7 +16,7 @@ Status: todo · in progress · done · blocked
 | S0.2 Laptops [S1] | each | in progress | Amogh: Windows done for B work (2026-11-10), see "Windows setup" | Macs can't run the planner natively (see Findings); use the CPU image below. Windows can't run the planner either (no mplib) |
 | S0.3 Docker + CHTC [S2] | Aditya | in progress | `docker/Dockerfile.cpu` (CPU, lavapipe) | CUDA image (CLAUDE.md §3.4) and CHTC submit files still todo |
 | A1 Randomised planner | Aditya | done (2026-11-06) | `src/gaussbridge/sim/planner_gen.py`, `scripts/gen_demos.py`, `scripts/plot_refs.py`, `tests/test_planner_gen.py` | 80% / 100% success per attempt; see A1 below |
-| A2 Extraction to Episodes | Aditya | in progress (2026-11-12) | — | C1 and C2 done; draft PR open |
+| A2 Extraction to Episodes | Aditya | done (2026-11-12) | `src/gaussbridge/sim/extract.py`, `scripts/extract_episodes.py`, `tests/test_extract.py` | 24/24 dev demos: one grasp interval, finger 18.3 mm; see A2 below |
 | A3 Physics replay [A2] | Aditya | todo | — | |
 | A4–A7 | Aditya | todo | — | |
 | B1 Capture environments | Amogh | done (2026-11-11) | `src/gaussbridge/sim/envs.py`, `src/gaussbridge/sim/capture.py`, `geometry.backproject`, `tests/test_capture.py`, `scripts/check_lighting.py`, `results/lighting/` | reprojection agreement 99.94–99.96%; lighting confirmed (21 dB cap); see B1 below |
@@ -103,8 +103,30 @@ PickCube** (1/12 above it, success tolerance is 25 mm); consider 1 cm.
 * Duration stats `LOG_DUR_MU = log 8`, `LOG_DUR_SIGMA = 0.35` are placeholders in `trajectory.py` until A4.
 * Pixel j covers u ∈ [j, j+1) (principal point W/2, H/2): index images with `floor(uv)`. Added to CLAUDE.md §4.
 
-**For the next tasks:** A2 can lift `_episode_from_shard` from `tests/test_sim_integration.py` (it is the extractor
-minus the attached rule); A3 can lift the replay loop from the same test.
+**For the next tasks:** A3 can lift the replay loop from `tests/test_sim_integration.py`.
+
+## A2 — extraction to Episodes
+
+```bash
+python scripts/extract_episodes.py --split train --out data/episodes/StackCube-v1 data/raw/StackCube-v1/shard_*.h5
+```
+Writes `<out>/<split>/<seed:05d>_<ref:02d>.npz` (one `Episode` each, `meta` incl. knobs and `git_commit`) and packs
+them as `<out>/<split>.tar` (one file for CHTC staging). In code: `sim.extract.load_shard(prefix)` → `[Episode]`;
+`attached_mask(...)` is the §5 rule (gripper commanded closed, finger < 39 mm, cube centre < 2 cm from the TCP via
+`PandaFK.tcp_pose`) and can be reused on generated motions.
+
+**Tests:** `test_extract.py` (both tasks, fresh 1 seed × 2 refs shard): the carried cube is attached on exactly one
+contiguous interval, finger 17–21 mm inside it, StackCube releases cubeA (and never attaches cubeB), PickCube still
+holds at the end, knobs sidecar matched by episode id. `test_sim_integration.py`'s round-trip test now extracts with
+`load_shard`. Full suite in the CPU image: 38 passed, 4 skipped (GPU).
+
+**All 24 A1 dev demos:**
+| Task | One grasp interval | Finger while held | Cube centre to TCP while held | Held at last step |
+|---|---|---|---|---|
+| StackCube-v1 | 12/12 (cubeB never) | 18.3–20.6 mm, median 18.3 | ≤ 4.7 mm | no (released) |
+| PickCube-v1 | 12/12 | 18.3–20.5 mm, median 18.3 | ≤ 4.4 mm | yes |
+The first held step reads ≈ 20.5 mm (fingers still closing), then 18.3 mm. CLAUDE.md §5 said "1–3 mm" to the TCP;
+updated to ≤ 5 mm.
 
 ## S0.1 — repo scaffold
 
