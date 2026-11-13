@@ -4,11 +4,11 @@
 #   git archive -o gb_code.tar.gz HEAD src scripts pyproject.toml chtc
 #   python scripts/extract_episodes.py --split dev --out data/episodes/StackCube-v1 artifacts/raw/StackCube-v1/dev.h5
 #   cp data/episodes/StackCube-v1/dev.tar episodes_dev.tar
-#   scp gb_code.tar.gz episodes_dev.tar chtc/overfit.sub chtc/overfit.sh <netid>@<submit node>:~/gb_overfit/
+#   scp gb_code.tar.gz episodes_dev.tar chtc/overfit.sub chtc/overfit.sh <netid>@<submit node>:~/gaussbridge/overfit/
 # On the submit node:
-#   cd ~/gb_overfit && mkdir -p logs && condor_submit overfit.sub
+#   cd ~/gaussbridge/overfit && mkdir -p logs && condor_submit overfit.sub
 #   condor_q ; condor_tail -f <job id>          (watch progress; ssh into GPU jobs is disabled)
-# Afterwards: overfit_out.tar.gz appears in ~/gb_overfit (log.jsonl, report.json, checkpoint.pt).
+# Afterwards: overfit_out.tar.gz appears in ~/gaussbridge/overfit (log.jsonl, report.json, checkpoint.pt).
 #
 # Inputs are < 1 MB, so they go straight from /home (no staging needed).
 # The public PyTorch image has the same torch as the project pin; never use a "latest" tag (CHTC caches images).

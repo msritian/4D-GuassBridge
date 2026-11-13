@@ -171,6 +171,9 @@ Verified from CHTC docs (2026):
   torch to a cu128 build would add Blackwell but is a team decision (gsplat build, ManiSkill pin).
 * For jobs that only need torch + numpy (motion model training) the public image
   `pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime` works; see `chtc/overfit.sub`.
+* Folder convention on the submit node: one directory per job type under `~/gaussbridge/` (e.g.
+  `~/gaussbridge/overfit/`), each with its own `logs/`; results come back to the folder the job was submitted
+  from, so never move it while the job runs.
 * `condor_ssh_to_job` is **disabled on shared GPU machines** (since 2026-04-22): debug with
   `condor_submit -i job.sub` (interactive) and watch logs with `condor_tail`.
 * Data: `/staging/<letter>/<netid>` (default 100 GB / 1000 files). Input 1–30 GB:

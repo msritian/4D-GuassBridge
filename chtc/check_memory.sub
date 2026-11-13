@@ -1,6 +1,7 @@
 # C3 acceptance: batch 256 in bf16 fits a 40 GB GPU (TASKS.md C3). A few minutes on one GPU.
 # Same setup as chtc/overfit.sub (public PyTorch image, code from `git archive`); asks for a 40 GB-class GPU so the
-# check runs on the budget it is about. Usage on the submit node: cd ~/gb_overfit && condor_submit check_memory.sub
+# check runs on the budget it is about. Usage: copy gb_code.tar.gz, check_memory.sub and check_memory.sh to
+# ~/gaussbridge/memcheck/ on the submit node, then: cd ~/gaussbridge/memcheck && mkdir -p logs && condor_submit check_memory.sub
 universe                = container
 container_image         = docker://pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 executable              = check_memory.sh
