@@ -43,7 +43,7 @@ Status legend: todo · in progress · blocked · done
 - Acceptance: 3 seeds × 4 refs for both tasks; success/attempt ≥ 0.8; lengths 120–300 steps; refs of a seed visibly
   differ (plot TCP xyz over time for the 4 refs).
 
-### A2 Extraction to Episodes — deps A1, C1 — Status: todo
+### A2 Extraction to Episodes — deps A1, C1 — owner: Aditya — Status: in progress (2026-11-12)
 - `sim/extract.py`: h5 + json + knobs → `Episode` list (§6.2), attached rule (§5) via `PandaFK`.
 - `scripts/extract_episodes.py` → `episodes/<env>/<split>/*.npz` packed per split as tar.
 - Acceptance: unit test on a generated shard: `attached` is True on a single contiguous interval per moved object,
