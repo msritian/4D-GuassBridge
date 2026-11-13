@@ -142,7 +142,7 @@ Status legend: todo · in progress · blocked · done
   TCP, hand camera viewmat; batch-flattening.
 - Acceptance: FK vs simulator link poses < 1e-5 m for 50 random configs (both robots).
 
-### C3 Dataset + model — deps C1, A2 (small shard ok) — owner: Shivam — Status: in progress (branch shivam/c3-motion-model)
+### C3 Dataset + model — deps C1, A2 (small shard ok) — owner: Shivam — Status: in progress (branch shivam/c3-c4-c5-model-training-eval; open items: progress.md "C3–C5 open items")
 - `model/dataset.py` (§6.3–6.4, endpoint-noise augmentation, analytic cube shapes until B4), `model/encoders.py`,
   `model/dit.py` (§8.1), `model/flow.py` (§8.2 loss, §8.3 sampler without guidance).
 - Acceptance: overfit 10 episodes (loss → ~0); sampled endpoints equal conditioning exactly (max abs diff 0);

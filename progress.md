@@ -149,6 +149,26 @@ recipe (constant lr, no EMA); C4 candidates: lr decay + EMA, and rescaling joint
 **CHTC lessons** (CLAUDE.md §3.5): Blackwell GPUs fail with torch 2.5.1 → request capability 8.0–9.0; job scripts
 always return logs; one folder per job type under `~/gaussbridge/`.
 
+## C3–C5 open items (branch `shivam/c3-c4-c5-model-training-eval`, one PR for all three)
+
+Updated as results come in. The PR merges when every **merge blocker** is ticked; the rest stays open in its task.
+
+| # | Task | Item | Merge blocker? | Status / evidence |
+|---|---|---|---|---|
+| 1 | all | CI green on Linux (planner + simulator tests, which cannot run on a Mac; shared files changed: `trajectory.py`, `kinematics.py`, `CLAUDE.md`) | yes | todo (runs when the PR opens) |
+| 2 | C3 | Batch 256 in bf16 fits a 40 GB GPU (TASKS.md C3 acceptance) | yes | todo: CHTC 8547380 queued (evicted once) |
+| 3 | C4 | GPU trial: full model, bf16, `pytorch_kinematics` install on the node, at least one real CHTC pause → restart → resume, validation metrics, `final_ema.pt` | yes | todo: CHTC 8547386 queued |
+| 4 | C3 | Overfit PickCube (1 object, padded slots on real data) | no (extra check) | running: CHTC 8547379.0 |
+| 5 | C3 | Overfit StackCube with all goal modes; object-only evaluation on real data | no (extra check) | running: CHTC 8547379.1 (step 1k: obj 17.0 mm full / 17.9 mm objects, endpoints exact) |
+| 6 | C3 | Overfit StackCube, full goal (TASKS.md C3 acceptance) | yes | **done**: CHTC 8539260, 6 mm / 0.9° / 0.026 rad to nearest episode, endpoints exact |
+| 7 | C3 | Sampled endpoints equal the conditioning exactly (TASKS.md C3 acceptance) | yes | **done**: tests + every evaluation of 8539260 (max diff 0) |
+| 8 | C5 | Sanity on dev data: references vs themselves coverage 1, precision 1, minADE 0; straight-line baseline scored | yes | **done**: `results/c5/*_dev.md` |
+| 9 | C5 | Penetration metric (needs C6 sphere proxies) | no → C6 | todo |
+| 10 | C5 | Physics-replay success (needs A3) | no → after A3 | todo |
+| 11 | C5 | Decide the coverage threshold (3 cm is lenient: references differ by 1.7–2.9 cm) | no → C8 | open question |
+| 12 | C4 | Real training run on the A4 split (150k steps) + val curves + 16 samples visualised (TASKS.md C4 acceptance) | no → after A4 | todo (needs A4) |
+| 13 | C4 | Try joint-feature rescaling / check joint error plateau (≈0.03 rad in the overfit) | no → C4 follow-up | open question |
+
 ## C4 — training pipeline (Shivam)
 
 ```bash
