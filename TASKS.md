@@ -21,7 +21,7 @@ Status legend: todo · in progress · blocked · done
 - Acceptance: `python -m mani_skill.examples.motionplanning.panda.run -e StackCube-v1 -n 3 --only-count-success`
   produces `demos/StackCube-v1/motionplanning/*.h5` (use `-b cpu`; with lavapipe set `VK_ICD_FILENAMES`).
 
-### S0.3 Docker image + CHTC — owner: Aditya — Status: todo
+### S0.3 Docker image + CHTC — owner: Aditya — Status: in progress — CPU job files done (2026-11-13, simulated locally); CHTC run + CUDA image todo
 - Build the image in §3.4 (gsplat from source with `TORCH_CUDA_ARCH_LIST`), push `gaussbridge:0.1`.
 - Request group staging dir; write `chtc/run.sh` and the submit templates (§3.5): CPU job, GPU short/resumable job,
   interactive job.

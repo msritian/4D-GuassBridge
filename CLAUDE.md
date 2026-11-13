@@ -157,6 +157,9 @@ Recommended: build from source with the arch list so jobs don't JIT-compile gspl
 
 ### 3.5 Compute: CHTC (UW–Madison) + Colab
 
+We use CHTC's **HTC system (HTCondor)**. CHTC's separate HPC cluster (Slurm) is not for this project: it has no GPUs,
+allows 10 running jobs per user, and is reserved for multi-node MPI work (CHTC HPC overview, checked 2026-11-13).
+
 Verified from CHTC docs (2026):
 * Submit file basics: `universe = container`, `container_image = docker://<user>/gaussbridge:0.3`,
   `request_gpus = 1`, `+WantGPULab = true`, `+GPUJobLength = "short"` (12 h) | `"medium"` (24 h, default) | `"long"` (7 days),
@@ -171,6 +174,9 @@ Verified from CHTC docs (2026):
   `Requirements = (Target.HasCHTCStaging == true)`. Output: `transfer_output_remaps = "out.tar = file:///staging/s/smittal39/out.tar"`.
   **Few big files** (tar shards), never thousands of small files. Upload/download via `transfer.chtc.wisc.edu`.
   Submit only from `/home`. Ask CHTC for a **group staging dir** so all three accounts share data.
+  The letter subdirectory is new since 2026-06-15 (old `/staging/<netid>` paths are gone); submit files can use
+  `$ENV(STAGING)` instead of hard-coding it. Planner data jobs (`chtc/gen_demos.sub`) return their ~30 MB shards to
+  the submit directory and need no staging; see progress.md "S0.3".
 * CPU jobs (planner data generation) start much faster than GPU jobs: use them.
 * Colab Pro: notebooks for visualisation and quick GPU debugging only (sessions die; no long training).
 
