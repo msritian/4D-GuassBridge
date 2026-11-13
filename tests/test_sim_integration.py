@@ -1,5 +1,4 @@
-"""C1 checked against ManiSkill and the A1 planner. Needs ManiSkill + mplib (Linux): run in docker/Dockerfile.cpu."""
-import json
+"""C1 + A2 checked against ManiSkill and the A1 planner. Needs ManiSkill + mplib (Linux): run in docker/Dockerfile.cpu."""
 import math
 
 import numpy as np
@@ -8,9 +7,9 @@ import torch
 
 pytest.importorskip("mani_skill")
 import gymnasium as gym  # noqa: E402
-import h5py  # noqa: E402
 
 from gaussbridge import geometry as G  # noqa: E402
+from gaussbridge.sim.extract import load_shard  # noqa: E402
 from gaussbridge.sim.planner_gen import generate  # noqa: E402
 from gaussbridge.trajectory import Episode, episode_to_motion, motion_to_episode  # noqa: E402
 
@@ -44,25 +43,10 @@ def test_camera_helpers_match_maniskill():
     env.close()
 
 
-def _episode_from_shard(prefix, env_id):
-    """ponytail: minimal stand-in for A2's extractor (attached left False until PandaFK exists)."""
-    seed = json.load(open(f"{prefix}.json"))["episodes"][0]["episode_seed"]
-    with h5py.File(f"{prefix}.h5") as f:
-        t = f["traj_0"]
-        arts = t["env_states/articulations"]
-        robot = arts[list(arts)[0]][:]
-        g = t["actions"][:, -1]
-        objs = OBJECTS[env_id]
-        return Episode(robot_qpos=robot[:, 13:22], gripper_cmd=np.append(g, g[-1]),
-                       obj_pose=np.stack([t[f"env_states/actors/{n}"][:, :7] for n in objs], 1),
-                       attached=np.zeros((len(robot), len(objs)), bool), base_pose=robot[0, :7],
-                       obj_names=objs, meta={"env_id": env_id, "seed": seed})
-
-
 @pytest.mark.parametrize("env_id", ["StackCube-v1", "PickCube-v1"])
 def test_planner_demo_survives_motion_round_trip_and_replays(tmp_path, env_id):
     generate(env_id, seed_start=0, num_seeds=1, refs_per_seed=1, out=tmp_path / "shard")
-    _episode_from_shard(tmp_path / "shard", env_id).save(tmp_path / "ep.npz")
+    load_shard(tmp_path / "shard")[0].save(tmp_path / "ep.npz")  # A2 extraction
     ep = Episode.load(tmp_path / "ep.npz")
 
     m = episode_to_motion(ep)

@@ -268,7 +268,8 @@ Motion planner (`mani_skill/examples/motionplanning/panda/`)
   planning ≈ 0.5 s per trajectory on one CPU core; ~80–100 % of attempts succeed.
 
 Grasp ("attached") facts from demos
-* While holding a 4 cm cube the finger joint reads ≈ 0.0183 m and the cube centre stays 1–3 mm from the TCP.
+* While holding a 4 cm cube the finger joint reads ≈ 0.0183 m and the cube centre stays within 5 mm of the TCP
+  (24 randomised demos, 2026-11-12: ≤ 4.7 mm; first held step ≈ 0.0205 m while the fingers finish closing).
 * Rule used everywhere (sim data and generated data): `attached_k(t) = (gripper_cmd(t) < 0) and (finger(t) < 0.039)
   and ‖p_obj_k(t) − p_tcp(t)‖ < 0.02`.
 * `agent.is_grasping(obj)` uses contact forces, which are stale after `set_state_dict` without a physics step →
@@ -360,7 +361,7 @@ Planned sizes (CPU, ~0.5 s each):
 Seed ranges must not overlap: train 0–1499, val 10000–10049, test 20000–20099, policy-real 30000–30099,
 policy-eval 40000+ (DP eval uses its own seeds; keep ours disjoint). Shard = 50 seeds per CHTC CPU job.
 
-### 6.2 Episode format (`episodes/<env_id>/<split>/<id>.npz`)
+### 6.2 Episode format (`episodes/<env_id>/<split>/<seed:05d>_<ref:02d>.npz`, packed as `<split>.tar`)
 | Key | Shape / type | Meaning |
 |---|---|---|
 | `robot_qpos` | [L+1, 9] f32 | joint state per step (ManiSkill order) |
