@@ -28,7 +28,8 @@ Status: todo · in progress · done · blocked
 | C3 Dataset + model | Shivam | in progress (2026-11-13): code done, overfit passed, memory check pending | `src/gaussbridge/model/{dataset,encoders,dit,flow,evaluate}.py`, `scripts/overfit_motion.py`, `scripts/check_memory.py`, `chtc/{overfit,check_memory}.{sub,sh}`, `tests/test_motion_*.py` | overfit on 10 real episodes: 6 mm / 0.9° / 0.026 rad to the nearest episode, endpoints exact; see C3 below |
 | C5 Metrics + harness | Shivam | in progress (2026-11-13): metrics, straight line, harness done; sanity passed | `src/gaussbridge/eval/{metrics,baselines}.py`, `scripts/eval_motion.py`, `tests/test_eval_metrics.py`, `results/c5/` | refs vs themselves: coverage 1, precision 1, minADE 0; penetration waits for C6 spheres, replay for A3; see C5 below |
 | C4 Training pipeline | Shivam | in progress (2026-11-13): pipeline done, CHTC trial running; real run needs A4 | `src/gaussbridge/model/train.py`, `scripts/train_motion.py`, `configs/train/stackcube_v1.yaml`, `chtc/{train.sub,train.sh,pack.sh}`, `tests/test_motion_train.py` | exact resume verified (CPU); see C4 below |
-| C6–C9 | Shivam | todo | — | |
+| C6 Guidance, projection, filters | Shivam | in progress (2026-11-13): collision, attach projection, sampler guidance + λ sweep done; filters/selection todo | `src/gaussbridge/guidance/`, `scripts/sweep_guidance.py` | λ = 1: penetration −35% vs λ = 0, diversity unchanged; samples still jittery (see C6 below) |
+| C7–C9 | Shivam | todo | — | |
 
 ## A1 — randomised planner demos
 
@@ -223,6 +224,38 @@ Results: `/staging/s/smittal39/gaussbridge/trial_stackcube_dev.tar.gz`.
 the 3 cm coverage threshold of §10.1, so one sample can "cover" several references; with the full goal even the
 straight line reaches coverage 0.17–0.33. Proposal: also report coverage/precision at 1 cm (and decide in C8).
 Jerk alone does not separate the straight line (0) from real motion; coverage and precision do.
+
+## C6 — guidance, projection, filters (Shivam, branch `shivam/c6-guidance-projection-filters`)
+
+* Part 1 `guidance/collision.py`: robot links = 32 spheres per link fitted to the volume of the URDF collision
+  geometry (`scripts/fit_spheres.py`, `guidance/spheres/*.json`), cubes = exact boxes, table z = 0. Measures EXCESS
+  penetration over the pair's start/end value. Planner refs (dev, both tasks): max excess 2.5 mm (< 5 mm threshold).
+* Part 2 `guidance/attach.py`: attachment energy + hard grasp projection (grip read 2 steps after grasping). All 24
+  dev refs accepted; release error ≤ 7.9 mm StackCube (cubeA nudged by cubeB while placed), < 0.02 mm PickCube.
+* Part 3 `guidance/guide.py` + `flow.sample(guidance=, guide_scale=)`: for τ < 0.6, Polyak step on x̂₀ = x_τ − τv,
+  one per energy term (λ = 1 halves a violation, 2 removes it to first order; λ = 0 = unguided bit for bit); never
+  moves given cells or attached flags. Tests on planner motions: cube 1 cm in the table → < 1 mm after one λ = 2
+  step; 3 mm hand jitter → 40× lower attachment energy in 3 steps; slow 2 cm drift only halves (left to projection).
+* **λ sweep, 2026-11-13 (CHTC 8581708, `scripts/sweep_guidance.py`, C3 overfit models, dev 3 seeds × 16 samples):**
+
+| model / goal | λ | pen (mm) | pen > 5 mm | slip (mm/step) | proj ok | jerk | minADE (cm) | cov@1cm | APD (cm) | s/sample |
+|---|---|---|---|---|---|---|---|---|---|---|
+| StackCube / objects | 0 | 19.9 | 0.98 | 12.1 | 0.08 | 1.7e4 | 0.99 | 0.58 | 1.75 | 0.10 |
+| | 0.5 | 15.1 | 0.92 | 9.4 | 0.19 | 1.2e4 | 0.95 | 0.67 | 1.70 | 0.20 |
+| | 1 | 13.2 | 0.81 | 8.3 | 0.12 | 1.0e4 | 0.92 | 0.67 | 1.68 | 0.20 |
+| | 2 | 11.0 | 0.71 | 11.3 | 0.10 | 1.7e4 | 0.92 | 0.58 | 1.77 | 0.20 |
+| StackCube / full | 0 | 23.1 | 1.00 | 11.6 | 0.08 | 1.8e4 | 1.16 | 0.42 | 1.72 | 0.09 |
+| | 1 | 14.9 | 0.92 | 8.6 | 0.12 | 1.2e4 | 1.11 | 0.50 | 1.68 | 0.20 |
+| PickCube / full | 0 | 13.6 | 0.88 | 12.3 | 0.00 | 4.0e4 | 2.64 | 0.00 | 1.80 | 0.03 |
+| | 1 | 9.3 | 0.79 | 8.5 | 0.00 | 2.3e4 | 2.60 | 0.00 | 1.67 | 0.07 |
+
+  (full tables incl. λ = 0.25 and coverage@3cm (1.00 StackCube, 0.58 PickCube, unchanged by λ): on CHTC
+  `~/gaussbridge/sweep/sweep_{stack,pick}/`.) Reading: guidance works in the right direction (penetration −35%,
+  slip −30%, jerk −40% at λ = 1) at no cost in diversity or coverage, 2× sampling time. λ = 2 overshoots (slip and
+  jerk rise again): **λ = 1 is the provisional choice.** But the samples themselves are far from physical (mean max
+  penetration 1–2 cm, cube slipping ~1 cm per step in the hand, jerk 1e4 vs 2–8 for refs), so guidance cannot rescue
+  them and the projection accepts only ~10%. The model's jitter is the bottleneck (C4 finding 1), not guidance.
+  Re-run the sweep (and the C6 acceptance: 50 val pairs) on the C4 model trained on full data.
 
 ## A2 — extraction to Episodes
 

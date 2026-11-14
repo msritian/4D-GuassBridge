@@ -124,7 +124,8 @@ def main():
         for lam in [float(v) for v in args.lams.split(",")]:
             rows = [run_case(model, ds, idx, goal, lam, args.samples, args.steps, int(seed), energy, fk, dur_stats,
                              args.device) for seed, idx in cases.items()]
-            mean = {k: sum(r[k] for r in rows) / len(rows) for k in rows[0]}
+            # nanmean: pen_proj_mm is nan for a case where the projection accepted no sample
+            mean = {k: torch.tensor([r[k] for r in rows], dtype=torch.float64).nanmean().item() for k in rows[0]}
             results[goal][lam] = mean
             print(json.dumps({"goal": goal, "lambda": lam, **mean}), flush=True)
     md = markdown(results, len(cases), args.samples)

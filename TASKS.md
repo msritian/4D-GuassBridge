@@ -158,7 +158,8 @@ Status legend: todo · in progress · blocked · done
 - Acceptance: metrics on planner references vs themselves (sanity: coverage 1.0) and on the straight-line baseline.
 
 ### C6 Guidance, projection, filters, diversity selection — deps C2, C3, B4 (spheres from Gaussians; use cube/box
-  spheres from geometry until then) — Status: todo
+  spheres from geometry until then) — owner: Shivam — Status: in progress (collision, projection, sampler guidance,
+  λ sweep done; filters + diversity selection + `scripts/sample.py` todo; acceptance needs the C4 full-data model)
 - `guidance/collision.py` (k-means spheres per part; energy; max-penetration metric), `guidance/attach.py`
   (energy + hard projection with rejection), filters and farthest-point selection in `scripts/sample.py`.
 - Acceptance: on 50 val pairs, guidance lowers penetration rate vs λ=0 without raising endpoint error; projection
