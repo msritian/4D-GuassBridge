@@ -99,22 +99,38 @@ def flow_loss(model, batch, generator=None):
 
 # ---------------------------------------------------------------------------------------------------- sampling
 @torch.no_grad()
-def sample(model, x_known, known, ent_mask, shapes, steps=40, generator=None):
+def sample(model, x_known, known, ent_mask, shapes, steps=40, generator=None, guidance=None, guide_scale=1.0,
+           guide_tau=None, trace=None):
     """Generate motions for a batch of conditions by Euler integration from tau = 1 (noise) to tau = 0 (data).
 
     Args: the conditioning tensors as in a batch ([B, ...]); steps = number of Euler steps (§8.3: 40).
     Returns (x [B, N, E, F], log_dur [B]): the given cells equal x_known exactly, padded slots are 0.
     To draw S different motions for one condition, repeat it S times along the batch dimension.
 
-    Guidance (collision / attachment energies, §8.3) is added in C6; it hooks in after each step."""
+    Guidance (C6, guidance/guide.py): guidance = an energy callable x -> [B] (e.g. guide.PhysicsEnergy) and
+    guide_scale = lambda. While tau < guide_tau (default 0.6), each step also computes the predicted clean motion
+    x0_hat = x - tau * v and moves x against the energy gradient at x0_hat (Polyak step, no backprop through the
+    network). The given cells stay exact (re-imposed after the step). guidance=None or guide_scale=0 gives exactly
+    the unguided sampler. trace: optional list; each guided step appends {"step", "tau", "energy" [B]}."""
     B, device = x_known.shape[0], x_known.device
     x = impose(torch.randn(x_known.shape, generator=generator, device=device), x_known, known, ent_mask)
     dur = torch.randn(B, generator=generator, device=device)
     taus = torch.linspace(1.0, 0.0, steps + 1, device=device)
     cond = {"x_known": x_known, "known": known, "ent_mask": ent_mask, "shapes": shapes}
+    guided = guidance is not None and guide_scale != 0
+    if guided:
+        from gaussbridge.guidance import guide  # lazy: guidance pulls in FK, which plain sampling does not need
+        guide_tau = guide.GUIDE_TAU if guide_tau is None else guide_tau
+        free = guide.guidable_mask(loss_mask(known, ent_mask, x_known.shape[-1]))
     for i in range(steps):
         tau, dtau = taus[i], taus[i + 1] - taus[i]  # dtau < 0: walking from noise back to data
         v, v_dur = model(x, dur, tau.expand(B), **cond)
-        x = impose(x + dtau * v.to(x.dtype), x_known, known, ent_mask)
+        x_next = x + dtau * v.to(x.dtype)
+        if guided and tau < guide_tau:
+            delta, energy = guide.guidance_step(x - tau * v.to(x.dtype), guidance, guide_scale, free)
+            x_next = x_next - delta
+            if trace is not None:
+                trace.append({"step": i, "tau": tau.item(), "energy": energy})
+        x = impose(x_next, x_known, known, ent_mask)
         dur = dur + dtau * v_dur.to(dur.dtype)
     return x, dur
