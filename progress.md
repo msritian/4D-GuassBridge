@@ -282,6 +282,29 @@ Findings:
 4. The EMA at 3k steps is worse than the raw weights: decay 0.999 still averages in early weights at 3k steps.
    Expected; not informative before ~10k+ steps.
 
+### Jitter fixes tested (2026-11-14, overfit CHTC 8595116 + diagnosis 8604302, StackCube dev, all goals, 10k steps)
+
+hf TCP (mm; refs 0.52) of samples, and of one-step guesses from real motions noised to τ = 0.02:
+| recipe | 40 steps | 100 steps | last jump from 0.05 / 0.1 / 0.2 | guess at τ = 0.02 | hf objects (mm, refs 0.34) | hf joints (mrad, refs 1.75) |
+|---|---|---|---|---|---|---|
+| baseline (`stack_allgoals`) | 10.6 | 32.4 | 10.9 / 14.3 / 22.8 | 19.4 | 1.39 | 27.4 |
+| A: 30% uniform τ (`stack_uni`) | 9.8 | **9.4** | 9.7 / 12.0 / 17.1 | **7.0** | 1.37 | 23.0 |
+| B: vel + acc loss (`stack_smooth`) | **8.9** | 31.1 | 8.4 / 9.2 / 23.6 | 21.4 | 1.34 | 22.6 |
+| A + B (`stack_uni_smooth`) | 13.2 | 11.9 | 15.1 / 15.6 / 20.7 | 12.8 | 2.34 | 30.0 |
+Endpoint/goal accuracy unchanged (obj 8.1–8.8 mm full goal, endpoints exact).
+
+Findings:
+1. **A (uniform τ) fixes the instability:** more sampling steps no longer hurt (100 steps 9.4 vs 32.4 mm) and the
+   network is now good at low noise (7 vs 19 mm at τ = 0.02). Keep it. But it barely changes 40-step samples.
+2. **B helps a little (−15%) and does not combine with A** (A + B is worse than either). Not adopted.
+3. **C (last-step jump) does not help** for any model. Not adopted.
+4. **Still ~20× rougher than the data, and the roughness is in the JOINTS:** objects are 4× the refs, joints 13–16×.
+   The joint features are squeezed: normalised by the joint LIMITS (range ~5.8 rad), real motions use only a sliver,
+   feature std 0.06–0.14 (joint 7: 0.45) vs 0.13–0.22 for object positions and 1.0 for the flow noise. A per-cell error
+   of 0.01 is 29 mrad on a joint (≈ 15 mm at the TCP) but 3 mm on an object. Next fix to test (E): standardise every
+   feature by its training-set mean/std inside the model (stored with the checkpoint, motion tensor format unchanged).
+   Then D (one token per 4 steps) if still needed.
+
 ## A2 — extraction to Episodes
 
 ```bash
