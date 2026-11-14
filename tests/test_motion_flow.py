@@ -148,3 +148,42 @@ def test_small_model_learns_two_motions():
     early, late = sum(losses[:10]) / 10, sum(losses[-20:]) / 20
     assert late < early / 5, (early, late)
     assert after < before / 4, (before, after)
+
+
+def test_uniform_tau_mix_reaches_low_noise():
+    g = torch.Generator().manual_seed(0)
+    from gaussbridge.model.flow import sample_tau
+    assert (sample_tau(20000, g) < 0.02).float().mean() < 0.001          # logit-normal: almost never
+    low = (sample_tau(20000, g, p_uniform=0.3) < 0.02).float().mean()
+    assert 0.004 < low < 0.008                                             # 0.3 * 0.02 = 0.006
+
+
+@pytest.mark.parametrize("p_uniform,w", [(0.3, 0.0), (0.0, 1.0)])
+def test_oracle_has_zero_loss_with_the_jitter_fixes(p_uniform, w):
+    batch = make_batch()
+    loss, stats = flow_loss(Oracle(batch["x0"], batch["log_dur"]), batch, torch.Generator().manual_seed(0),
+                            p_uniform=p_uniform, w_vel=w, w_acc=w)
+    assert loss.item() < 1e-8, stats
+
+
+def test_smoothness_loss_sees_jitter_the_velocity_loss_averages_out():
+    """Same per-cell error size, one smooth (a constant offset) and one alternating: the smoothness loss is 0 for the
+    offset and large for the alternation."""
+    from gaussbridge.model.flow import smoothness_loss
+    batch = make_batch()
+    x0, ent = batch["x0"], batch["ent_mask"]
+    offset = x0 + 0.01
+    sign = torch.tensor([1.0, -1.0]).repeat(64)[None, :, None, None]
+    jitter = x0 + 0.01 * sign
+    for order in (1, 2):
+        assert smoothness_loss(offset, x0, ent, order) < 1e-10
+        assert smoothness_loss(jitter, x0, ent, order) > (0.02 * order) ** 2 * 0.5
+
+
+@pytest.mark.parametrize("goal", ["full", "objects"])
+def test_last_tau_jump_still_lands_on_the_data(goal):
+    batch = make_batch(goal)
+    x, dur = sample(Oracle(batch["x0"], batch["log_dur"]), *(batch[k] for k in COND), steps=10, last_tau=0.1,
+                    generator=torch.Generator().manual_seed(0))
+    torch.testing.assert_close(x, batch["x0"], atol=1e-5, rtol=0)
+    torch.testing.assert_close(dur, batch["log_dur"], atol=1e-5, rtol=0)

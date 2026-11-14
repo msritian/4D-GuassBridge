@@ -43,7 +43,10 @@ output = logs/$(run)_$(Cluster).out
 error  = logs/$(run)_$(Cluster).err
 
 # episodes tar, run name, extra arguments
+# Done: pick_full (8547379), stack_allgoals (8547378; also the baseline of the jitter fixes below).
+# Jitter fixes (progress.md, jitter diagnosis), 2026-11-14:
 queue episodes, run, extra from (
-  episodes_pick_dev.tar,  pick_full,       --goals full
-  episodes_stack_dev.tar, stack_allgoals,  --goals all
+  episodes_stack_dev.tar, stack_uni,         --goals all --p-uniform 0.3
+  episodes_stack_dev.tar, stack_smooth,      --goals all --w-vel 1.0 --w-acc 1.0
+  episodes_stack_dev.tar, stack_uni_smooth,  --goals all --p-uniform 0.3 --w-vel 1.0 --w-acc 1.0
 )

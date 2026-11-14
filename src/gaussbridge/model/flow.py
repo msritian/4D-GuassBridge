@@ -36,10 +36,18 @@ DUR_LOSS_WEIGHT = 0.1   # CLAUDE.md §8.2
 
 
 # ---------------------------------------------------------------------------------------------------- shared
-def sample_tau(batch, generator=None, device="cpu"):
-    """Noise levels for training: logit-normal, tau = sigmoid(N(0, 1)) (Esser et al. 2024, SD3).
-    It puts most samples at medium noise, where predicting the velocity is hardest and most useful."""
-    return torch.sigmoid(torch.randn(batch, generator=generator, device=device))
+def sample_tau(batch, generator=None, device="cpu", p_uniform=0.0):
+    """Noise levels for training: logit-normal, tau = sigmoid(N(0, 1)) (Esser et al. 2024, SD3), which puts most
+    samples at medium noise, where predicting the velocity is hardest. With p_uniform > 0, that fraction of the batch
+    draws tau ~ U(0, 1) instead: the logit-normal almost never gives tau < 0.05 (logit(0.02) = -3.9 sigma), yet the
+    last sampling steps run exactly there, and an untrained network there leaves jittery motions (progress.md,
+    jitter diagnosis)."""
+    tau = torch.sigmoid(torch.randn(batch, generator=generator, device=device))
+    if p_uniform > 0:
+        u = torch.rand(batch, generator=generator, device=device)
+        pick = torch.rand(batch, generator=generator, device=device) < p_uniform
+        tau = torch.where(pick, u, tau)
+    return tau
 
 
 def impose(x, x_known, known, ent_mask):
@@ -72,14 +80,28 @@ def noisy_sample(batch, tau, eps, eps_dur):
     return x_t, dur_t
 
 
-def flow_loss(model, batch, generator=None):
+def smoothness_loss(x0_hat, x0, ent_mask, order):
+    """Mean squared error of the order-th time difference (1 = velocity, 2 = acceleration) of the predicted clean
+    motion vs the real one, over real entities and features (the given cells take part: a jump next to the start or
+    end is jitter too). x0_hat = x_tau - tau * v, so the error is tau * (velocity error): it weighs low noise most,
+    where the final motion is decided. Penalises step-to-step noise that the per-cell velocity loss cannot see
+    (independent per-token errors average out in it, but not in differences; MDM, Tevet et al. 2023, does the same
+    with its velocity loss)."""
+    d = torch.diff(x0_hat - x0, n=order, dim=1)                                    # [B, N - order, E, F]
+    w = ent_mask[:, None, :, None].expand_as(d).clone().float()
+    w[:, :, 0, ROBOT_PAD_FEATURE] = 0
+    return (d.square() * w).sum() / w.sum().clamp_min(1)
+
+
+def flow_loss(model, batch, generator=None, p_uniform=0.0, w_vel=0.0, w_acc=0.0):
     """Flow-matching loss on one batch (a dict as produced by MotionDataset + DataLoader).
 
-    Returns (loss, stats): loss = mean squared velocity error over the learned cells + 0.1 * duration error.
-    stats (floats, for logging) splits the motion error into robot and objects."""
+    Returns (loss, stats): loss = mean squared velocity error over the learned cells + 0.1 * duration error
+    + w_vel * velocity and w_acc * acceleration error of the predicted clean motion (smoothness_loss; 0 = off).
+    p_uniform: see sample_tau. stats (floats, for logging) splits the motion error into robot and objects."""
     x0, dur0 = batch["x0"], batch["log_dur"].to(batch["x0"].dtype)
     B = x0.shape[0]
-    tau = sample_tau(B, generator, x0.device)
+    tau = sample_tau(B, generator, x0.device, p_uniform)
     eps = torch.randn(x0.shape, generator=generator, device=x0.device)
     eps_dur = torch.randn(B, generator=generator, device=x0.device)
     x_t, dur_t = noisy_sample({**batch, "log_dur": dur0}, tau, eps, eps_dur)
@@ -91,7 +113,13 @@ def flow_loss(model, batch, generator=None):
     motion = err.sum() / mask.sum().clamp_min(1)
     duration = (v_dur.float() - (eps_dur - dur0)).square().mean()
     loss = motion + DUR_LOSS_WEIGHT * duration
-    stats = {"loss": loss.item(), "motion": motion.item(), "duration": duration.item(),
+    stats = {}
+    if w_vel or w_acc:
+        x0_hat = x_t - tau[:, None, None, None] * v.float()
+        vel, acc = smoothness_loss(x0_hat, x0, batch["ent_mask"], 1), smoothness_loss(x0_hat, x0, batch["ent_mask"], 2)
+        loss = loss + w_vel * vel + w_acc * acc
+        stats = {"vel": vel.item(), "acc": acc.item()}
+    stats |= {"loss": loss.item(), "motion": motion.item(), "duration": duration.item(),
              "robot": (err[:, :, 0].sum() / mask[:, :, 0].sum().clamp_min(1)).item(),
              "objects": (err[:, :, 1:].sum() / mask[:, :, 1:].sum().clamp_min(1)).item()}
     return loss, stats
@@ -100,7 +128,7 @@ def flow_loss(model, batch, generator=None):
 # ---------------------------------------------------------------------------------------------------- sampling
 @torch.no_grad()
 def sample(model, x_known, known, ent_mask, shapes, steps=40, generator=None, guidance=None, guide_scale=1.0,
-           guide_tau=None, trace=None):
+           guide_tau=None, trace=None, last_tau=None):
     """Generate motions for a batch of conditions by Euler integration from tau = 1 (noise) to tau = 0 (data).
 
     Args: the conditioning tensors as in a batch ([B, ...]); steps = number of Euler steps (§8.3: 40).
@@ -111,11 +139,18 @@ def sample(model, x_known, known, ent_mask, shapes, steps=40, generator=None, gu
     guide_scale = lambda. While tau < guide_tau (default 0.6), each step also computes the predicted clean motion
     x0_hat = x - tau * v and moves x against the energy gradient at x0_hat (Polyak step, no backprop through the
     network). The given cells stay exact (re-imposed after the step). guidance=None or guide_scale=0 gives exactly
-    the unguided sampler. trace: optional list; each guided step appends {"step", "tau", "energy" [B]}."""
+    the unguided sampler. trace: optional list; each guided step appends {"step", "tau", "energy" [B]}.
+
+    last_tau: if set (e.g. 0.1), the first steps - 1 steps go evenly from tau = 1 to last_tau and the last step
+    jumps from last_tau straight to 0. An Euler step to tau = 0 lands on the network's clean guess x - tau * v, so
+    this skips the lowest noise levels, where a network trained with logit-normal tau is weakest."""
     B, device = x_known.shape[0], x_known.device
     x = impose(torch.randn(x_known.shape, generator=generator, device=device), x_known, known, ent_mask)
     dur = torch.randn(B, generator=generator, device=device)
-    taus = torch.linspace(1.0, 0.0, steps + 1, device=device)
+    if last_tau is None:
+        taus = torch.linspace(1.0, 0.0, steps + 1, device=device)
+    else:
+        taus = torch.cat([torch.linspace(1.0, last_tau, steps, device=device), torch.zeros(1, device=device)])
     cond = {"x_known": x_known, "known": known, "ent_mask": ent_mask, "shapes": shapes}
     guided = guidance is not None and guide_scale != 0
     if guided:

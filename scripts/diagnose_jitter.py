@@ -109,6 +109,17 @@ def main():
                     per.append(jitter(x.float(), k, fk, durs[seed]))
                 record({"exp": "sample", "model": name, "steps": steps, "bf16": bf16,
                         **{m: sum(r[m] for r in per) / len(per) for m in per[0]}})
+        # sampler ending with one jump from last_tau to 0 (flow.sample), 40 steps
+        for last_tau in (0.05, 0.1, 0.2):
+            per = []
+            for seed, idx in cases.items():
+                _, x_known, known, ent, shapes = cond_of(ds, idx, args.samples, dev)
+                g = torch.Generator(dev).manual_seed(int(seed))
+                with torch.autocast(device_type=dev, dtype=torch.bfloat16, enabled=dev == "cuda"):
+                    x, _ = sample(model, x_known, known, ent, shapes, steps=40, generator=g, last_tau=last_tau)
+                per.append(jitter(x.float(), k, fk, durs[seed]))
+            record({"exp": "jump", "model": name, "last_tau": last_tau,
+                    **{m: sum(r[m] for r in per) / len(per) for m in per[0]}})
         # one-step clean guesses from noised real motions (fp32)
         for tau in (0.02, 0.1, 0.3, 0.6):
             per, err = [], []
@@ -134,7 +145,8 @@ def main():
     for r in rows:
         label = r["exp"] + (f" {r['model']}" if "model" in r else "") + \
             (f" steps={r['steps']} {'bf16' if r['bf16'] else 'fp32'}" if r["exp"] == "sample" else "") + \
-            (f" tau={r['tau']}" if r["exp"] == "denoise" else "")
+            (f" tau={r['tau']}" if r["exp"] == "denoise" else "") + \
+            (f" 40 steps, last jump from {r['last_tau']}" if r["exp"] == "jump" else "")
         md.append(f"| {label} | " + " | ".join(f"{r[c]:.3g}" for c in cols) + f" | {r.get('err_mm', float('nan')):.3g} |")
     args.out.with_suffix(".md").write_text("\n".join(md) + "\n")
     print("\n".join(md))

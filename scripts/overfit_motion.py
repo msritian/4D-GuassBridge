@@ -55,6 +55,9 @@ def parse_args():
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--goals", choices=["full", "all"], default="full", help="goal modes used in training")
+    p.add_argument("--p-uniform", type=float, default=0.0, help="fraction of tau drawn uniformly (flow.sample_tau)")
+    p.add_argument("--w-vel", type=float, default=0.0, help="velocity loss weight (flow.smoothness_loss)")
+    p.add_argument("--w-acc", type=float, default=0.0, help="acceleration loss weight (flow.smoothness_loss)")
     p.add_argument("--eval-goals", default=None, help="comma list of full,objects (default: full; full,objects "
                    "when --goals all)")
     args = p.parse_args()
@@ -122,7 +125,7 @@ def main():
             batch = torch.utils.data.default_collate([ds[int(i)] for i in idx])
             assert args.goals == "all" or (batch["goal"] == GOAL_FULL).all()
             batch = {k: v.to(args.device) for k, v in batch.items()}
-            loss, stats = flow_loss(model, batch)
+            loss, stats = flow_loss(model, batch, p_uniform=args.p_uniform, w_vel=args.w_vel, w_acc=args.w_acc)
             opt.zero_grad(set_to_none=True)
             loss.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0).item()
