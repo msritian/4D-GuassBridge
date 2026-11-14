@@ -257,6 +257,31 @@ Jerk alone does not separate the straight line (0) from real motion; coverage an
   them and the projection accepts only ~10%. The model's jitter is the bottleneck (C4 finding 1), not guidance.
   Re-run the sweep (and the C6 acceptance: 50 val pairs) on the C4 model trained on full data.
 
+### Jitter diagnosis (2026-11-14, CHTC 8591071, `scripts/diagnose_jitter.py`, StackCube dev, full goal)
+
+hf = RMS of |x_n − (x_{n−1} + x_{n+1})/2| (the part of a track its neighbours do not explain). Planner refs:
+TCP 0.52 mm, objects 0.34 mm, joints 1.75 mrad, jerk 8.7.
+
+| model | sampler 20 / 40 / 100 / 200 steps: hf TCP (mm) | bf16 vs fp32 (40 steps) | one-step guess from a noised REAL motion, τ = 0.02 / 0.1 / 0.3 / 0.6: hf TCP (mm) |
+|---|---|---|---|
+| C3 overfit, 10k steps, no EMA | 10.9 / 10.6 / 32.4 / 36.2 | 10.6 / 10.6 | 19.4 / 13.2 / 23.7 / 45.6 |
+| C4 trial 3k steps, raw | 11.6 / 19.3 / 39.1 / 45.5 | 19.3 / 19.2 | 22.2 / 11.7 / 20.4 / 39.9 |
+| C4 trial 3k steps, EMA | 54.4 / 65.7 / 82.5 / 88.8 | 65.7 / 65.6 | 39.1 / 45.2 / 58.9 / 71.8 |
+
+Findings:
+1. **Not precision** (bf16 = fp32 to 0.1%). **Not Euler error:** more sampling steps make it WORSE (×3 from 40 to
+   200), the opposite of integration error.
+2. **The network is worst at the lowest noise.** From a real motion noised to τ = 0.02 (barely any noise), the
+   network's clean guess is jittery by 19–22 mm, worse than from τ = 0.1 (12–13 mm). The logit-normal τ (§8.2)
+   almost never trains τ < 0.05 (logit(0.02) = −3.9σ), so the final sampling steps run where the network is
+   untrained; more steps = more time there = more jitter. Fix candidates: mix uniform τ into the logit-normal
+   (low τ gets trained), and/or end sampling with one jump x̂₀ from τ ≈ 0.1.
+3. **Even at its best the network's output is ~20× rougher than the data** (10 mm vs 0.5 mm): it predicts each of
+   the 128 time tokens with independent error. Transformer motion models are known for this (MDM adds velocity
+   losses); candidates: a velocity/acceleration loss on x̂₀, or temporal patches (one token per 4 steps).
+4. The EMA at 3k steps is worse than the raw weights: decay 0.999 still averages in early weights at 3k steps.
+   Expected; not informative before ~10k+ steps.
+
 ## A2 — extraction to Episodes
 
 ```bash
