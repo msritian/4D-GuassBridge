@@ -1,0 +1,49 @@
+# C3 overfit checks on CHTC GPUs (CLAUDE.md §3.5). One job per line of the queue list at the bottom.
+#
+# On your laptop (repo root), for each task in the queue list:
+#   python scripts/extract_episodes.py --split dev --out data/episodes/StackCube-v1 artifacts/raw/StackCube-v1/dev.h5
+#   cp data/episodes/StackCube-v1/dev.tar episodes_stack_dev.tar        (PickCube-v1 -> episodes_pick_dev.tar)
+#   git archive -o gb_code.tar.gz HEAD src scripts pyproject.toml chtc
+#   scp gb_code.tar.gz episodes_*_dev.tar chtc/overfit.sub chtc/overfit.sh <netid>@<submit node>:~/gaussbridge/overfit/
+# On the submit node:
+#   cd ~/gaussbridge/overfit && mkdir -p logs && condor_submit overfit.sub
+#   condor_q ; condor_tail -f <job id>          (watch progress; ssh into GPU jobs is disabled)
+# Afterwards: <run>.tar.gz appears in ~/gaussbridge/overfit (log.jsonl, report.json, checkpoint.pt).
+#
+# History: job 8539260 = StackCube, full goal, 10k steps (passed, progress.md "C3"); it used the older single-job form
+# of this file. Inputs are < 1 MB, so they go straight from /home (no staging needed).
+# The public PyTorch image has the same torch as the project pin; never use a "latest" tag (CHTC caches images).
+
+universe                = container
+container_image         = docker://pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+executable              = overfit.sh
+arguments               = $(episodes) $(run) --steps 10000 --batch 64 --eval-every 1000 $(extra)
+transfer_input_files    = gb_code.tar.gz, $(episodes)
+transfer_output_files   = $(run).tar.gz
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+
+request_gpus            = 1
++WantGPULab             = true
++GPUJobLength           = "short"
+# Also run on research groups' idle GPUs (backfill); the job may be interrupted and restarted, fine for checks
+# under ~2 h. Without it, capability 8.0-9.0 GPUs were often all busy (1 matching slot, jobs idle > 1 h).
++is_resumable           = true
+gpus_minimum_memory     = 16G
+# torch 2.5.1 (cu124) has kernels for sm_50..sm_90 only: Blackwell (RTX PRO 6000, GB10 = capability 12.x)
+# fails with "no kernel image is available" (job 8539255). 8.0-9.0 = A100, A30, A40, L40(S), H100, H200.
+gpus_minimum_capability = 8.0
+gpus_maximum_capability = 9.0
+request_cpus            = 4
+request_memory          = 16GB
+request_disk            = 10GB
+
+log    = logs/$(run)_$(Cluster).log
+output = logs/$(run)_$(Cluster).out
+error  = logs/$(run)_$(Cluster).err
+
+# episodes tar, run name, extra arguments
+queue episodes, run, extra from (
+  episodes_pick_dev.tar,  pick_full,       --goals full
+  episodes_stack_dev.tar, stack_allgoals,  --goals all
+)

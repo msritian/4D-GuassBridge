@@ -50,7 +50,10 @@ ManiSkill's **Diffusion Policy** baseline trained on real demos vs. real + our g
 3. Small, tested steps. Every task in `TASKS.md` has an acceptance test; a task is done only when it passes.
 4. CPU-first where possible: everything except Gaussian rendering/training and model training runs on a laptop or
    CHTC CPU node (ManiSkill runs headless on CPU with software Vulkan, §3.3).
-5. Reproducibility: Hydra configs, fixed seeds, git commit hash saved with every artifact, W&B logging.
+5. Reproducibility: config files, fixed seeds, git commit hash saved with every artifact, W&B logging.
+   **Decision 2026-11-13 (Shivam):** plain YAML configs (`configs/`) with strict `key=value` overrides
+   (`model/train.py::load_config`) instead of Hydra (no extra dependency in CHTC jobs); W&B optional, off until the
+   team project exists; every run logs to `<run>/log.jsonl` and saves its resolved `config.yaml`.
 6. Keep `TASKS.md` current: owner, status, link to PR/commit, measured numbers.
 7. Don't rewrite or delete teammates' work without asking in the task's thread.
 
@@ -164,6 +167,16 @@ Verified from CHTC docs (2026):
 * Per-user GPU limits: short ≤ 2/3 of GPU Lab GPUs, medium ≤ 1/3, long ≤ 4 GPUs. Three accounts = 3× quota.
 * GPU Lab (open capacity): H200 141 GB, H100 80 GB, A100 80/40 GB, L40/L40S 44 GB, RTX PRO 6000 94 GB, … L40S are
   plentiful and fine for rendering and model training.
+* **Blackwell GPUs do not work with our torch pin (verified 2026-11-13, job 8539255):** torch 2.5.1 (cu124) has
+  kernels for sm_50–sm_90 only, so RTX PRO 6000 Blackwell and GB10 (capability 12.x) fail with "CUDA error: no kernel
+  image is available for execution on the device". Every GPU submit file needs `gpus_minimum_capability = 8.0` and
+  `gpus_maximum_capability = 9.0` (A100, A30, A40, L40/L40S, H100, H200; ~100 of them idle at the time). Upgrading
+  torch to a cu128 build would add Blackwell but is a team decision (gsplat build, ManiSkill pin).
+* For jobs that only need torch + numpy (motion model training) the public image
+  `pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime` works; see `chtc/overfit.sub`.
+* Folder convention on the submit node: one directory per job type under `~/gaussbridge/` (e.g.
+  `~/gaussbridge/overfit/`), each with its own `logs/`; results come back to the folder the job was submitted
+  from, so never move it while the job runs.
 * `condor_ssh_to_job` is **disabled on shared GPU machines** (since 2026-04-22): debug with
   `condor_submit -i job.sub` (interactive) and watch logs with `condor_tail`.
 * Data: `/staging/<letter>/<netid>` (default 100 GB / 1000 files). Input 1–30 GB:
@@ -394,8 +407,14 @@ Extraction: `robot_qpos = env_states/articulations/<uid>[:, 13:22]`, `base_pose 
   rendered-surface samples reach a median 0.019 m. Files: `assets/<env>/<obj>.points.npy` (StackCube copies in
   `artifacts/assets/`). **C6: fit collision spheres to these points, not to Gaussian centres** (same bias).
 * **Height map:** 64×64 over x,y ∈ [−0.4, 0.4] m of the **static** background (table) from background Gaussians or
-  sim; constant (flat) for v1 tasks, kept for generality.
-* Endpoint-noise augmentation on the *known copy* only: objects 5 mm / 2°, joints 0.01 rad.
+  sim; constant (flat) for v1 tasks, kept for generality. **Not built in v1 (decision 2026-11-12, Shivam):** a
+  constant input carries no information, so C3 has no height-map encoder; the context is a token list, so one can be
+  added for a task with obstacles.
+* Endpoint-noise augmentation on the *known copy* only: objects 5 mm / 2°, joints 0.01 rad. **As built
+  (`model/dataset.py`):** Gaussian standard deviations, position per axis, rotation about a random axis, the 7 arm
+  joints only (finger, gripper command and attached flag stay exact). Goal-mode dropout is drawn per sample as
+  none 0.1 / objects 0.3 / full 0.6. Duration μ, σ are computed from the training episodes (`duration_stats`) and
+  must be stored with the checkpoint.
 
 ---
 
@@ -521,7 +540,7 @@ On held-out configurations and on planner trajectories (where ManiSkill can rend
 * Tokens: one per (step n, entity e): 128 × 4 = 512, plus 1 duration token. Token embedding =
   `Linear(F)(x_τ) + Linear(F+1)([x_known·known, known]) + entity-slot embedding + sinusoidal(n)` + (objects) shape token.
 * Context (cross-attention): a learned null token, object shape tokens (PointNet: per-point MLP 6→128→256, concat
-  max & mean pool → MLP → d), height-map tokens (4 stride-2 convs → 4×4 = 16 tokens).
+  max & mean pool → MLP → d), height-map tokens (4 stride-2 convs → 4×4 = 16 tokens; not built in v1, see §6.4).
 * 8 blocks, d = 384, 6 heads, MLP ratio 4: self-attention over all motion tokens (+ padding mask for missing
   objects), cross-attention to context, MLP; flow time τ through **adaLN-Zero** (DiT). Output heads zero-initialised:
   per-token velocity [F] and duration velocity. ≈ 30 M parameters. (If attention cost matters: factorise into
@@ -605,6 +624,9 @@ reference's full end (full goal). Draw S = 32 samples after filtering. Report me
 | Rejection rate | % candidates removed by projection/filters |
 | Speed | samples/s on one GPU |
 ADE = mean over steps and tracked points (TCP + objects) of Euclidean distance, on the 128-step grid.
+**Measured 2026-11-13 (C5, dev data):** references of one start differ by only 1.7–2.9 cm ADE, below the 3 cm
+threshold, so coverage@3 cm is lenient (the straight line gets 0.17–0.33 with the full goal). Also report @1 cm;
+decide the headline threshold in C8.
 
 ### 10.2 Rendering quality
 PSNR/SSIM/LPIPS vs ManiSkill renders (policy cameras) for: asset mode, scene mode (start+end only), scene mode +
@@ -758,7 +780,7 @@ generation", "Gaussian splatting demonstration synthesis", "trajectory diffusion
 ## 15. Open decisions (owner decides, then record here)
 * [ ] Confirm course deadline and report format (CVPR template, as for the proposal?) — Shivam, by Nov 9.
 * [ ] Group staging directory requested from CHTC — Aditya, by Nov 9.
-* [ ] W&B team project name — Shivam.
+* [ ] W&B team project name — Shivam. (Training works without it: file logs; switch on via `wandb.enabled`.)
 * [ ] Robot end in conditioning for the downstream data: object-only goal (default) vs full goal.
 * [ ] Real-world stretch go/no-go at G4 (needs a tabletop, phone, AprilTag; no robot needed: objects-only mode
       requires training a variant with the robot token masked).

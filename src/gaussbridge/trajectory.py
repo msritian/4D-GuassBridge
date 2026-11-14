@@ -54,6 +54,15 @@ class Episode:
         return cls(**d)
 
 
+def episode_files(directory):
+    """Sorted Episode .npz files of a directory, skipping macOS "._*" metadata files (AppleDouble): macOS tar stores
+    one per file, they also end in .npz, and on Linux they unpack as real files that np.load cannot read (CHTC job
+    8547386 crashed on them). Every script that lists episodes should use this."""
+    from pathlib import Path
+
+    return sorted(f for f in Path(directory).glob("*.npz") if not f.name.startswith("._"))
+
+
 def resample(x, n, kind="linear"):
     """[T, ...] samples evenly spaced in time -> [n, ...]. kind: 'linear', 'slerp' (wxyz quaternions, last dim)
     or 'hold' (nearest sample; gripper / attached). First and last samples are kept exactly."""
@@ -91,7 +100,7 @@ def known_mask(ent_mask, goal="full", n=N_STEPS):
     """[..., n, E] bool of entries held fixed (inpainted). goal: 'full' = start + end of every entity,
     'objects' = robot end unknown, 'none' = start only (forward-only baseline)."""
     assert goal in ("full", "objects", "none"), goal
-    known = torch.zeros(*ent_mask.shape[:-1], n, ent_mask.shape[-1], dtype=torch.bool)
+    known = torch.zeros(*ent_mask.shape[:-1], n, ent_mask.shape[-1], dtype=torch.bool, device=ent_mask.device)
     known[..., 0, :] = ent_mask
     if goal != "none":
         known[..., -1, :] = ent_mask
@@ -100,9 +109,11 @@ def known_mask(ent_mask, goal="full", n=N_STEPS):
     return known
 
 
-def decode_motion(x, log_dur):
+def decode_motion(x, log_dur, dur_stats=None):
     """Motion tensor [..., n, E, 10] -> physical quantities on the n-step grid (differentiable; for guidance).
-    Object outputs cover all K_MAX slots; padded slots are meaningless."""
+    Object outputs cover all K_MAX slots; padded slots are meaningless. dur_stats = {"mu", "sigma"} used to
+    normalise log-duration (the model's training stats, model.dataset.duration_stats); None = the module defaults."""
+    mu, sigma = (LOG_DUR_MU, LOG_DUR_SIGMA) if dur_stats is None else (dur_stats["mu"], dur_stats["sigma"])
     r, o = x[..., 0, :], x[..., 1:, :]
     finger = (r[..., 7:8] + 1) / 2 * FINGER_MAX
     return {
@@ -111,13 +122,14 @@ def decode_motion(x, log_dur):
         "obj_pos": o[..., :3] * POS_SCALE + POS_CENTER.to(x),
         "obj_rot": G.rot6d_to_matrix(o[..., 3:9]),  # [..., n, K_MAX, 3, 3]
         "attached": o[..., 9],                      # > 0 attached
-        "duration": torch.exp(torch.as_tensor(log_dur) * LOG_DUR_SIGMA + LOG_DUR_MU),  # seconds
+        "duration": torch.exp(torch.as_tensor(log_dur) * sigma + mu),  # seconds
     }
 
 
-def motion_to_episode(x, log_dur, obj_names, base_pose, meta=None, control_freq=CONTROL_FREQ):
-    """One motion tensor [n, E, 10] -> Episode at control_freq (for physics replay, rendering, DP export)."""
-    d = decode_motion(x.detach().float().cpu(), torch.as_tensor(log_dur).detach().float().cpu())
+def motion_to_episode(x, log_dur, obj_names, base_pose, meta=None, control_freq=CONTROL_FREQ, dur_stats=None):
+    """One motion tensor [n, E, 10] -> Episode at control_freq (for physics replay, rendering, DP export).
+    dur_stats: as in decode_motion (pass the model's training stats for generated motions)."""
+    d = decode_motion(x.detach().float().cpu(), torch.as_tensor(log_dur).detach().float().cpu(), dur_stats)
     L = max(1, round(float(d["duration"]) * control_freq))
     k = len(obj_names)
     quat = G.matrix_to_quat(d["obj_rot"][:, :k])

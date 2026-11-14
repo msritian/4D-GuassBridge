@@ -143,18 +143,18 @@ Status legend: todo · in progress · blocked · done
   TCP, hand camera viewmat; batch-flattening.
 - Acceptance: FK vs simulator link poses < 1e-5 m for 50 random configs (both robots).
 
-### C3 Dataset + model — deps C1, A2 (small shard ok) — Status: todo
+### C3 Dataset + model — deps C1, A2 (small shard ok) — owner: Shivam — Status: in progress (branch shivam/c3-c4-c5-model-training-eval; open items: progress.md "C3–C5 open items")
 - `model/dataset.py` (§6.3–6.4, endpoint-noise augmentation, analytic cube shapes until B4), `model/encoders.py`,
   `model/dit.py` (§8.1), `model/flow.py` (§8.2 loss, §8.3 sampler without guidance).
 - Acceptance: overfit 10 episodes (loss → ~0); sampled endpoints equal conditioning exactly (max abs diff 0);
   forward pass on batch 256 fits a 40 GB GPU in bf16.
 
-### C4 Training pipeline — deps C3, A4, S0.3 — Status: todo
+### C4 Training pipeline — deps C3, A4, S0.3 — owner: Shivam — Status: in progress (pipeline built + tested; waiting for A4 data for the real run)
 - `scripts/train_motion.py` (Hydra; AdamW, cosine, EMA, bf16, resumable checkpoints every 2k steps, W&B); CHTC job.
 - Acceptance: StackCube v1 model trained 150k steps; val loss curve; 16 sampled trajectories visualised (matplotlib
   3D TCP/object tracks + one Gaussian-rendered video once B5 exists).
 
-### C5 Metrics + evaluation harness — deps C1 — Status: todo
+### C5 Metrics + evaluation harness — deps C1 — owner: Shivam — Status: in progress (sanity passed on dev data; penetration after C6, replay after A3)
 - `eval/metrics.py` (§10.1), `scripts/eval_motion.py` (test split, both goal modes, S = 32), JSON + markdown table output.
 - Acceptance: metrics on planner references vs themselves (sanity: coverage 1.0) and on the straight-line baseline.
 

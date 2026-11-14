@@ -1,0 +1,38 @@
+# C4: StackCube motion model, full recipe (CLAUDE.md §8.2). Override any key from the command line, e.g.
+# (write floats with a dot in this file, 2.0e-4 not 2e-4: YAML 1.1 reads 2e-4 as text; overrides handle both)
+#   python scripts/train_motion.py configs/train/stackcube_v1.yaml --run runs/x --set optim.steps=1000 optim.bf16=false
+task: StackCube-v1
+seed: 0
+data:
+  train: data/episodes/StackCube-v1/train   # directory of Episode .npz files (A4 split)
+  val: data/episodes/StackCube-v1/val       # null = no validation
+  p_none: 0.1                               # goal-mode mix: start only
+  p_objects: 0.3                            # start + objects' end (robot end free); the rest is full goal
+  endpoint_noise: true                      # 5 mm / 2 deg / 0.01 rad on the given copy (dataset.py)
+model:                                      # MotionDiT, about 30 M parameters
+  d_model: 384
+  depth: 8
+  heads: 6
+  mlp_ratio: 4
+optim:
+  lr: 2.0e-4
+  weight_decay: 0.01
+  warmup: 2000
+  min_lr_ratio: 0.0                         # cosine decays to lr * this at the last step
+  grad_clip: 1.0
+  batch: 256
+  steps: 150000
+  bf16: true                                # GPU only; ignored on CPU
+  ema: 0.999
+log:
+  every: 100                                # training-loss lines
+  val_loss_every: 2000
+  val_sample_every: 10000                   # sample + C5 metrics on val starts (0 = off)
+  val_samples: 16                           # samples per val start
+  val_max_cases: 20                         # val starts used for sampling (null = all)
+  sample_steps: 40
+  ckpt_every: 2000
+  keep_ckpts: 2
+wandb:
+  enabled: false                            # optional, off until the team project exists (CLAUDE.md §15)
+  project: null

@@ -5,6 +5,7 @@ Does not import ManiSkill (only reads its URDF files), so it is cheap to use in 
 """
 import contextlib
 import importlib.util
+import os
 from pathlib import Path
 
 import pytorch_kinematics as pk
@@ -21,7 +22,13 @@ HAND_CAMERA_LINK = "camera_link"
 
 
 def urdf_path(robot_uid):
-    """Path of the URDF ManiSkill uses for robot_uid, found without importing mani_skill (which loads SAPIEN)."""
+    """Path of the URDF ManiSkill uses for robot_uid, found without importing mani_skill (which loads SAPIEN).
+    If the environment variable GB_URDF_DIR is set, the file is read from <GB_URDF_DIR>/<same relative path>
+    instead (for jobs without ManiSkill, e.g. training in the plain PyTorch image; chtc/train.sh ships the files).
+    FK only needs the kinematic tree, so the meshes the URDF refers to need not exist."""
+    override = os.environ.get("GB_URDF_DIR")
+    if override:
+        return Path(override) / URDFS[robot_uid]
     spec = importlib.util.find_spec("mani_skill")
     if spec is None:
         raise ImportError("mani_skill is not installed; it provides the Panda URDFs")

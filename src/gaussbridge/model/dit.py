@@ -1,0 +1,183 @@
+"""C3: MotionDiT, the network at the heart of the motion model (CLAUDE.md §8.1).
+
+What it does
+------------
+Input: a partly noisy motion grid plus what is known about it. Output: a "velocity" for every cell, i.e. the
+direction from the clean motion towards the noise (flow.py explains how training and sampling use it).
+
+    inputs                                         shapes (B = batch, N = 128 steps, E = 4 slots, F = 10)
+      x_t       noisy motion, known cells already replaced by their given values     [B, N, E, F]
+      dur_t     noisy normalised log-duration                                         [B]
+      tau       noise level: 0 = clean data, 1 = pure noise                           [B]
+      x_known   given values (0 where not given)                                      [B, N, E, F]
+      known     which cells are given                                                 [B, N, E] bool
+      ent_mask  which entity slots exist (robot + this task's objects)                [B, E] bool
+      shapes    object shape points, slot k = entity k + 1                            [B, E-1, P, 6]
+    outputs
+      v         velocity per cell                                                     [B, N, E, F]
+      v_dur     velocity of the duration                                              [B]
+
+How it is built
+---------------
+1. Tokens. Every cell (step n, entity e) becomes one token, plus one extra token for the duration:
+   128 * 4 + 1 = 513 tokens of width d. A cell's token is the sum of
+       Linear(x_t cell)                     what the noisy motion currently says here
+       Linear([x_known cell, known flag])   the given start/end value, and whether this cell is given at all
+       entity embedding                     robot / object slot 1 / 2 / 3 (learned)
+       step embedding                       sinusoidal code of the step index n (fixed)
+       shape token                          (object slots only) what this object looks like
+2. 8 blocks, each: self-attention over all 513 tokens (padded entity slots are hidden as keys, so real tokens
+   never read them), cross-attention to the context [learned "null" token, shape tokens of present objects],
+   and an MLP.
+3. Noise level tau conditions every block through adaLN-Zero (DiT, Peebles & Xie 2023): from tau's embedding each
+   block computes a shift, scale and gate for each of its three sub-layers. The gates start at zero, so at
+   initialisation every block is the identity and the output heads (also zero) predict 0: training starts from
+   a stable, "do nothing" network.
+4. Output heads: per cell token -> F numbers (velocity); duration token -> 1 number.
+
+Why one token per (step, entity) with full attention: the robot's token at step 40 can directly look at a cube's
+tokens at steps 0 and 127, i.e. where the cube is and where it must end up. That is what lets the model plan the
+whole motion at once. At 513 tokens full attention is cheap; no factorisation is needed (§8.1).
+
+Default size (d = 384, 8 blocks, 6 heads, MLP ratio 4) is about 30 M parameters.
+"""
+import math
+
+import torch
+import torch.nn.functional as F
+from torch import nn
+
+from gaussbridge.model.encoders import PointSetEncoder
+from gaussbridge.trajectory import K_MAX, N_STEPS, NUM_FEATURES
+
+
+# ---------------------------------------------------------------------------------------------------- helpers
+def sinusoidal(x, dim, max_period=10000.0):
+    """Fixed sinusoidal code [..., dim] of real numbers x [...] (as in Transformers and DiT)."""
+    half = dim // 2
+    freqs = torch.exp(-math.log(max_period) * torch.arange(half, dtype=torch.float32, device=x.device) / half)
+    angles = x.float()[..., None] * freqs
+    return torch.cat([torch.cos(angles), torch.sin(angles)], -1)
+
+
+def modulate(x, shift, scale):
+    """adaLN: a LayerNorm output x [B, S, d] shifted and scaled per sample by shift, scale [B, d]."""
+    return x * (1 + scale[:, None]) + shift[:, None]
+
+
+class Attention(nn.Module):
+    """Multi-head attention of queries x [B, S, d] over keys/values ctx [B, T, d].
+    key_mask [B, T] bool: False = this key is hidden from every query (padding)."""
+
+    def __init__(self, d, heads):
+        super().__init__()
+        self.heads = heads
+        self.q, self.kv, self.out = nn.Linear(d, d), nn.Linear(d, 2 * d), nn.Linear(d, d)
+
+    def forward(self, x, ctx, key_mask):
+        B, S, d = x.shape
+        q = self.q(x).view(B, S, self.heads, -1).transpose(1, 2)                   # [B, h, S, d/h]
+        k, v = self.kv(ctx).view(B, ctx.shape[1], 2, self.heads, -1).permute(2, 0, 3, 1, 4)
+        y = F.scaled_dot_product_attention(q, k, v, attn_mask=key_mask[:, None, None, :])
+        return self.out(y.transpose(1, 2).reshape(B, S, d))
+
+
+class Block(nn.Module):
+    """self-attention -> cross-attention -> MLP, each pre-normed, modulated and gated by the noise level."""
+
+    def __init__(self, d, heads, mlp_ratio):
+        super().__init__()
+        self.norm1, self.norm2, self.norm3 = (nn.LayerNorm(d, elementwise_affine=False, eps=1e-6) for _ in range(3))
+        self.self_attn = Attention(d, heads)
+        self.cross_attn = Attention(d, heads)
+        self.mlp = nn.Sequential(nn.Linear(d, mlp_ratio * d), nn.GELU(approximate="tanh"), nn.Linear(mlp_ratio * d, d))
+        self.ada = nn.Sequential(nn.SiLU(), nn.Linear(d, 9 * d))  # shift, scale, gate for each of 3 sub-layers
+
+    def forward(self, x, c, token_mask, ctx, ctx_mask):
+        (shift1, scale1, gate1, shift2, scale2, gate2, shift3, scale3, gate3) = self.ada(c).chunk(9, -1)
+        h = modulate(self.norm1(x), shift1, scale1)
+        x = x + gate1[:, None] * self.self_attn(h, h, token_mask)                                    # tokens <-> tokens
+        x = x + gate2[:, None] * self.cross_attn(modulate(self.norm2(x), shift2, scale2), ctx, ctx_mask)  # -> shapes
+        x = x + gate3[:, None] * self.mlp(modulate(self.norm3(x), shift3, scale3))                   # per token
+        return x
+
+
+# ---------------------------------------------------------------------------------------------------- model
+class MotionDiT(nn.Module):
+    """See the module docstring. `config` holds the constructor arguments (saved with checkpoints)."""
+
+    def __init__(self, n_steps=N_STEPS, n_entities=1 + K_MAX, n_features=NUM_FEATURES, d_model=384, depth=8,
+                 heads=6, mlp_ratio=4):
+        super().__init__()
+        self.config = {"n_steps": n_steps, "n_entities": n_entities, "n_features": n_features, "d_model": d_model,
+                       "depth": depth, "heads": heads, "mlp_ratio": mlp_ratio}
+        d = d_model
+        self.n_steps, self.n_entities, self.n_features = n_steps, n_entities, n_features
+
+        # 1. token embeddings
+        self.embed_x = nn.Linear(n_features, d)
+        self.embed_known = nn.Linear(n_features + 1, d)
+        self.entity_emb = nn.Parameter(torch.zeros(n_entities, d))
+        self.register_buffer("step_emb", sinusoidal(torch.arange(n_steps), d), persistent=False)  # [N, d]
+        self.embed_dur = nn.Linear(1, d)
+        self.dur_emb = nn.Parameter(torch.zeros(d))  # marks the duration token as such
+        self.shape_encoder = PointSetEncoder(d)
+        self.null_ctx = nn.Parameter(torch.zeros(1, d))  # always-present context token (nothing to attend to)
+
+        # noise level tau -> conditioning vector c
+        self.tau_mlp = nn.Sequential(nn.Linear(256, d), nn.SiLU(), nn.Linear(d, d))
+
+        # 2. transformer blocks
+        self.blocks = nn.ModuleList(Block(d, heads, mlp_ratio) for _ in range(depth))
+
+        # 4. output: final adaLN (shift, scale) + linear heads
+        self.norm_out = nn.LayerNorm(d, elementwise_affine=False, eps=1e-6)
+        self.ada_out = nn.Sequential(nn.SiLU(), nn.Linear(d, 2 * d))
+        self.head = nn.Linear(d, n_features)
+        self.head_dur = nn.Linear(d, 1)
+        self._init_weights()
+
+    def _init_weights(self):
+        """DiT initialisation: Xavier for linear layers, small random embeddings, and ZERO for every adaLN layer
+        and the output heads, so each block starts as the identity and the network starts by predicting 0."""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+        for p in (self.entity_emb, self.dur_emb, self.null_ctx):
+            nn.init.normal_(p, std=0.02)
+        for m in [blk.ada[-1] for blk in self.blocks] + [self.ada_out[-1], self.head, self.head_dur]:
+            nn.init.zeros_(m.weight)
+            nn.init.zeros_(m.bias)
+
+    def forward(self, x_t, dur_t, tau, x_known, known, ent_mask, shapes):
+        B, N, E, Fdim = x_t.shape
+        d = self.config["d_model"]
+
+        # --- context: null token + one shape token per object slot (absent objects hidden)
+        shape_tok = self.shape_encoder(shapes) * ent_mask[:, 1:, None]                 # [B, E-1, d]
+        ctx = torch.cat([self.null_ctx.expand(B, 1, d), shape_tok], 1)                # [B, E, d]
+        ctx_mask = torch.cat([ent_mask.new_ones(B, 1), ent_mask[:, 1:]], 1)            # [B, E]
+
+        # --- motion tokens [B, N, E, d]
+        given = torch.cat([x_known * known[..., None], known[..., None].to(x_t.dtype)], -1)
+        tok = self.embed_x(x_t) + self.embed_known(given) + self.entity_emb + self.step_emb[:, None]
+        tok = tok + F.pad(shape_tok, (0, 0, 1, 0))[:, None]  # robot slot (0) gets no shape token
+        tok = tok.reshape(B, N * E, d)                         # token index = n * E + e
+
+        # --- duration token, appended last
+        dur_tok = self.embed_dur(dur_t[:, None].to(x_t.dtype)) + self.dur_emb             # [B, d]
+        tokens = torch.cat([tok, dur_tok[:, None]], 1)                                     # [B, N*E + 1, d]
+        token_mask = torch.cat([ent_mask[:, None].expand(B, N, E).reshape(B, N * E), ent_mask.new_ones(B, 1)], 1)
+
+        # --- blocks, conditioned on the noise level
+        c = self.tau_mlp(sinusoidal(tau * 1000, 256).to(x_t.dtype))                      # [B, d]
+        for blk in self.blocks:
+            tokens = blk(tokens, c, token_mask, ctx, ctx_mask)
+
+        # --- heads
+        shift, scale = self.ada_out(c).chunk(2, -1)
+        tokens = modulate(self.norm_out(tokens), shift, scale)
+        v = self.head(tokens[:, :-1]).reshape(B, N, E, Fdim)
+        v_dur = self.head_dur(tokens[:, -1])[:, 0]
+        return v, v_dur

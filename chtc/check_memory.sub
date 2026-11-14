@@ -1,0 +1,32 @@
+# C3 acceptance: batch 256 in bf16 fits a 40 GB GPU (TASKS.md C3). A few minutes on one GPU.
+# Same setup as chtc/overfit.sub (public PyTorch image, code from `git archive`); asks for a 40 GB-class GPU so the
+# check runs on the budget it is about. Usage: copy gb_code.tar.gz, check_memory.sub and check_memory.sh to
+# ~/gaussbridge/memcheck/ on the submit node, then: cd ~/gaussbridge/memcheck && mkdir -p logs && condor_submit check_memory.sub
+universe                = container
+container_image         = docker://pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+executable              = check_memory.sh
+transfer_input_files    = gb_code.tar.gz
+transfer_output_files   = memory.json
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+
+request_gpus            = 1
++WantGPULab             = true
++GPUJobLength           = "short"
+# Also run on research groups' idle GPUs (backfill); the job may be interrupted and restarted, fine for checks
+# under ~2 h. Without it, capability 8.0-9.0 GPUs were often all busy (1 matching slot, jobs idle > 1 h).
++is_resumable           = true
+# 24 GB, not 40: 40 GB-class supported GPUs were scarce (job 8540436 waited > 1 h with 1 matching slot). Peak
+# memory is the same on any card; an out-of-memory run is recorded as {"oom": true} in memory.json.
+gpus_minimum_memory     = 24G
+# torch 2.5.1 has no Blackwell (capability 12.x) kernels, see chtc/overfit.sub
+gpus_minimum_capability = 8.0
+gpus_maximum_capability = 9.0
+request_cpus            = 2
+request_memory          = 16GB
+request_disk            = 5GB
+
+log    = logs/check_memory_$(Cluster).log
+output = logs/check_memory_$(Cluster).out
+error  = logs/check_memory_$(Cluster).err
+queue 1

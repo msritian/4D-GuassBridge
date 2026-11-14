@@ -26,7 +26,10 @@ Status: todo · in progress · done · blocked
 | B5–B8 | Amogh | todo | — | |
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
-| C3–C9 | Shivam | todo | — | |
+| C3 Dataset + model | Shivam | in progress (2026-11-13): code done, overfit passed, memory check pending | `src/gaussbridge/model/{dataset,encoders,dit,flow,evaluate}.py`, `scripts/overfit_motion.py`, `scripts/check_memory.py`, `chtc/{overfit,check_memory}.{sub,sh}`, `tests/test_motion_*.py` | overfit on 10 real episodes: 6 mm / 0.9° / 0.026 rad to the nearest episode, endpoints exact; see C3 below |
+| C5 Metrics + harness | Shivam | in progress (2026-11-13): metrics, straight line, harness done; sanity passed | `src/gaussbridge/eval/{metrics,baselines}.py`, `scripts/eval_motion.py`, `tests/test_eval_metrics.py`, `results/c5/` | refs vs themselves: coverage 1, precision 1, minADE 0; penetration waits for C6 spheres, replay for A3; see C5 below |
+| C4 Training pipeline | Shivam | in progress (2026-11-13): pipeline done, CHTC trial running; real run needs A4 | `src/gaussbridge/model/train.py`, `scripts/train_motion.py`, `configs/train/stackcube_v1.yaml`, `chtc/{train.sub,train.sh,pack.sh}`, `tests/test_motion_train.py` | exact resume verified (CPU); see C4 below |
+| C6–C9 | Shivam | todo | — | |
 
 ## A1 — randomised planner demos
 
@@ -104,6 +107,122 @@ already gives up to 3.3 mm vs 0.7–2.0 mm with the planner's own actions. A3's 
 * Pixel j covers u ∈ [j, j+1) (principal point W/2, H/2): index images with `floor(uv)`. Added to CLAUDE.md §4.
 
 **For the next tasks:** A3 can lift the replay loop from `tests/test_sim_integration.py`.
+
+## C3 — dataset + motion model (Shivam)
+
+**Code** (`src/gaussbridge/model/`, all pure torch, run anywhere):
+* `dataset.py` — `MotionDataset(episodes)`: per sample the clean grid `x0 [128,4,10]`, `known [128,4]`, the given copy
+  `x_known` (endpoint noise 5 mm / 2° / 0.01 rad on the given copy only), `log_dur` normalised with `duration_stats`
+  of the training episodes, cube shape points `[3,512,6]` (`box_shape_points`, same format as
+  `PartSplats.shape_points`). Goal mode per sample: none 0.1 / objects 0.3 / full 0.6.
+* `encoders.py` — `PointSetEncoder` (PointNet). No height-map encoder (constant input in v1, CLAUDE.md §6.4).
+* `dit.py` — `MotionDiT`: 513 tokens (128 steps × 4 slots + duration), 8 blocks, d 384, adaLN-Zero, padded slots masked;
+  30.5 M parameters; predicts 0 at initialisation.
+* `flow.py` — `flow_loss` (logit-normal τ, given cells never noised, loss over free real cells, duration weight 0.1) and
+  `sample` (40 Euler steps, given cells re-imposed every step). Padded slots and the robot spacer feature are held at 0.
+* `evaluate.py` — `motion_errors`: joint rad, finger mm, object mm / deg, duration s.
+* `trajectory.decode_motion` / `motion_to_episode` take `dur_stats` (the model's training stats) for generated motions.
+
+**Tests:** 30 in `tests/test_motion_{dataset,dit,flow,evaluate}.py` (CPU, ~20 s): sample layout, goal-mode masks and
+frequencies, noise sizes, padding isolation, every input reaches the output, batch independence, all parameters get
+gradients, oracle tests (an oracle velocity gives zero loss and the sampler following it lands exactly on the data),
+exact endpoints in all goal modes, a tiny model learning two motions. Every test was checked against a planted bug.
+Two real bugs found this way: a noisy robot spacer feature (train/sample mismatch) and `known_mask` ignoring the device.
+
+**Overfit check** (`scripts/overfit_motion.py`, CHTC job 8539260, A100 MIG 3g.40gb, 10k steps, batch 64, lr 3e-4
+constant, full-goal mode, no endpoint noise; 10 StackCube dev episodes = seeds 0–2; 115 min):
+
+| step | loss | joint (rad) | cube pos (mm) own / nearest | cube rot (deg) | duration (s) own / nearest | endpoints |
+|---|---|---|---|---|---|---|
+| 0 (untrained) | ~1.4 | ~2.0 | ~485 | ~125 | | |
+| 1,000 | 0.172 | 0.050 | 13.9 / 11.8 | 1.89 | 0.53 | exact |
+| 5,000 | 0.014 | 0.032 | 8.8 / 5.7 | 1.11 | 0.43 | exact |
+| 10,000 | 0.011 | 0.036 / **0.026** | 10.5 / **6.0** | **0.97** / 0.93 | 0.57 / **0.04** | **exact (max diff 0)** |
+
+"Nearest" = against the closest of the 10 training episodes. 5 of 10 samples reproduce their own episode (≈ 6 mm,
+duration within 0.03–0.09 s); the other 5 reproduce a sibling with the **same start, same grasp yaw and end states
+within 0.023 rad / 7 mm** (smaller than the endpoint noise), i.e. the same request with two valid answers. So the model
+learned both modes; this is the diversity we want, not a failure. Loss plateaus at ≈ 0.011 (not → 0) with this simple
+recipe (constant lr, no EMA); C4 candidates: lr decay + EMA, and rescaling joint features (arm joints vary with std
+0.06–0.13 in model units vs noise std 1). Results: `runs/overfit_8539260/` locally, `~/gaussbridge/overfit/` on CHTC.
+
+**CHTC lessons** (CLAUDE.md §3.5): Blackwell GPUs fail with torch 2.5.1 → request capability 8.0–9.0; job scripts
+always return logs; one folder per job type under `~/gaussbridge/`.
+
+## C3–C5 open items (branch `shivam/c3-c4-c5-model-training-eval`, one PR for all three)
+
+Updated as results come in. The PR merges when every **merge blocker** is ticked; the rest stays open in its task.
+
+| # | Task | Item | Merge blocker? | Status / evidence |
+|---|---|---|---|---|
+| 1 | all | CI green on Linux (planner + simulator tests, which cannot run on a Mac; shared files changed: `trajectory.py`, `kinematics.py`, `CLAUDE.md`) | yes | **done**: PR #10 CI run 43496909955, 86 passed, 5 skipped (GPU), 3m38s |
+| 2 | C3 | Batch 256 in bf16 fits a 40 GB GPU (TASKS.md C3 acceptance) | yes | **done**: CHTC 8547380 on A100-SXM4-40GB: bf16 batch 256 peak **26.8 GB** (< 40 GB), 0.31 s/step; fp32 does not fit (OOM). 150k steps ≈ 13 h on this card (plan said 6–8 h) |
+| 3 | C4 | GPU trial: full model, bf16, `pytorch_kinematics` install on the node, at least one real CHTC pause → restart → resume, validation metrics, `final_ema.pt` | yes | **done**: CHTC 8549894 (8547386 crashed first: macOS tar's hidden `._*.npz` files; fixed in `chtc/pack.sh` + `trajectory.episode_files`). Full model, bf16, A100; **two real pause → restart → resume cycles** (2143 → 2755 → 3000, exit 85, 85, 0); validation incl. C5 metrics on the node; `final_ema.pt` written. Details: C4 section |
+| 4 | C3 | Overfit PickCube (1 object, padded slots on real data) | no (extra check) | **done** (CHTC 8547379.0, 10k steps): joint 0.024 rad, obj 8.4 mm (nearest ref 4.0), rot 0.9°, dur 0.36 s, endpoints exact; padded slots handled |
+| 5 | C3 | Overfit StackCube with all goal modes; object-only evaluation on real data | no (extra check) | **done**: CHTC 8547379.1, 10k steps, trained on all goal modes: full goal 8.0 mm / 0.67° / 0.024 rad (nearest 3.9 mm); **object-only goal 9.7 mm / 0.68° (nearest 3.9 mm)**, joints 0.050 rad (robot end is free, so its joints may legitimately differ); endpoints exact in both modes |
+| 6 | C3 | Overfit StackCube, full goal (TASKS.md C3 acceptance) | yes | **done**: CHTC 8539260, 6 mm / 0.9° / 0.026 rad to nearest episode, endpoints exact |
+| 7 | C3 | Sampled endpoints equal the conditioning exactly (TASKS.md C3 acceptance) | yes | **done**: tests + every evaluation of 8539260 (max diff 0) |
+| 8 | C5 | Sanity on dev data: references vs themselves coverage 1, precision 1, minADE 0; straight-line baseline scored | yes | **done**: `results/c5/*_dev.md` |
+| 9 | C5 | Penetration metric (needs C6 sphere proxies) | no → C6 | todo |
+| 10 | C5 | Physics-replay success (needs A3) | no → after A3 | todo |
+| 11 | C5 | Decide the coverage threshold (3 cm is lenient: references differ by 1.7–2.9 cm) | no → C8 | open question |
+| 12 | C4 | Real training run on the A4 split (150k steps) + val curves + 16 samples visualised (TASKS.md C4 acceptance) | no → after A4 | todo (needs A4) |
+| 13 | C4 | Try joint-feature rescaling / check joint error plateau (≈0.03 rad in the overfit) | no → C4 follow-up | open question |
+
+## C4 — training pipeline (Shivam)
+
+```bash
+python scripts/train_motion.py configs/train/stackcube_v1.yaml --run runs/<name> [--set optim.steps=1000 ...] [--max-minutes 120]
+bash chtc/pack.sh <train episodes dir> <val episodes dir> <bundle dir>    # then condor_submit chtc/train.sub
+```
+* Recipe (CLAUDE.md §8.2) in `model/train.py::Trainer`: all goal modes + endpoint noise, AdamW 2e-4 / wd 0.01, 2k warm-up +
+  cosine, grad clip 1.0, bf16 on GPU, EMA 0.999 (validation and `final_ema.pt` use it), checkpoints every 2k steps
+  (atomic, last 2 kept). Validation: EMA loss over the val set; every 10k steps 16 samples per val start (object-only
+  goal) scored with the C5 metrics (also coverage/precision @1 cm).
+* **Exact resume:** all randomness of step n comes from a generator seeded by (seed, n); test: 5 steps + stop + new
+  Trainer + resume == 12 uninterrupted steps, bit-identical weights/EMA/optimiser on CPU.
+* **CHTC:** `chtc/train.sub` uses self-checkpointing: `--max-minutes` → checkpoint + exit 85 → HTCondor saves the run
+  directory and restarts the job (maybe elsewhere, `+is_resumable`), which resumes. Public PyTorch image +
+  `pip install pytorch_kinematics==0.7.6` + the two Panda URDFs shipped in the bundle (`GB_URDF_DIR`, kinematics.py).
+* Config: plain YAML + strict overrides (decision, CLAUDE.md §1); floats in YAML need a dot (2.0e-4), overrides accept 1e-4.
+* Bugs found by the tests: initial weights were unseeded (runs not reproducible), PyYAML read `1e-3` as text, a log
+  window was dropped on pause, a second `--set` replaced the first.
+
+**GPU trial (CHTC 8549894, 2026-11-13; StackCube dev, train = val = 12 episodes, 3000 steps, 12-min segments):**
+| step | train loss | lr | val loss (EMA) | val samples (object goal, EMA): minADE / cov@3cm / prec@3cm / APD | jerk (m²/s⁶) |
+|---|---|---|---|---|---|
+| 1000 | 0.024 | 1.6e-4 | 0.875 | 41.4 cm / 0.00 / 0.00 / 46.2 cm | 4.2e7 |
+| 2000 | 0.017 | 5.2e-5 | 0.136 | 8.6 cm / 0.00 / 0.00 / 8.8 cm | 2.8e6 |
+| 3000 | 0.014 | 2e-7 | 0.049 | 2.9 cm / 0.58 / 0.29 / 3.5 cm | 3.6e5 |
+Endpoints exact throughout. Findings for the real run: (1) samples are jittery: jerk 3.6e5 vs 2–8 for planner motions
+(the C6 "jerk > 99th percentile of training" filter would reject everything); recheck after full training, else
+smooth / more sampling steps. (2) Speed depends on the card: ~180 steps/min (segment 1) vs ~50 (segment 2).
+(3) Checkpoints are 488 MB (model + EMA + optimiser): ~1 GB per run; write runs to /staging (home quota 40 GB).
+Results: `/staging/s/smittal39/gaussbridge/trial_stackcube_dev.tar.gz`.
+
+## C5 — metrics + evaluation harness (Shivam)
+
+* `eval/metrics.py`: tracks = TCP (FK) + object centres on the 128-step grid; `ade`, `min_ade`, `coverage`, `precision`
+  (@3 cm), `apd`, `mean_squared_jerk` (float64), `endpoint_errors` (object cm, object rotation with the 24 cube
+  symmetries, TCP cm). Not yet: penetration (needs C6 sphere proxies), physics replay (needs A3).
+* `eval/baselines.py`: `straight_line` (§8.4) in grid form; with an unknown robot end the robot stays at its start.
+* `scripts/eval_motion.py --episodes <dir> --out results/c5/<name>`: cases = start seeds, goal modes objects + full
+  (conditioning = reference 0), methods `refs` (sanity) and `straight`; a model plugs in as one more method.
+* Tests (`tests/test_eval_metrics.py`, 8): hand-made tracks with known answers, jerk of t³ = 36, cube symmetry, TCP
+  track = FK, baseline masks/half-way/valid rotations, harness sanity; each checked against a planted bug.
+
+**Dev data (3 seeds × 4 refs per task, `results/c5/*_dev.md`), goal = objects:**
+| task | method | end obj (cm) | end TCP (cm) | minADE (cm) | coverage@3cm | precision@3cm | APD (cm) | jerk (m²/s⁶) |
+|---|---|---|---|---|---|---|---|---|
+| StackCube | refs | 0.23 | 0.54 | 0.00 | 1.00 | 1.00 | 1.74 | 3.34 |
+| StackCube | straight | 0.00 | 14.05 | 5.27 | 0.00 | 0.00 | 0.00 | 0.00 |
+| PickCube | refs | 0.30 | 0.31 | 0.00 | 1.00 | 1.00 | 2.92 | 3.78 |
+| PickCube | straight | 0.00 | 12.05 | 7.14 | 0.00 | 0.00 | 0.00 | 0.00 |
+
+**Open question for C8 (threshold):** references from one start differ by only 1.7–2.9 cm ADE on average, below
+the 3 cm coverage threshold of §10.1, so one sample can "cover" several references; with the full goal even the
+straight line reaches coverage 0.17–0.33. Proposal: also report coverage/precision at 1 cm (and decide in C8).
+Jerk alone does not separate the straight line (0) from real motion; coverage and precision do.
 
 ## A2 — extraction to Episodes
 
@@ -351,6 +470,8 @@ $py = "$env:USERPROFILE\anaconda3\envs\gaussbridge\python.exe"
 
 ## Findings that affect everyone
 
+* **CHTC Blackwell GPUs (RTX PRO 6000, GB10) fail with torch 2.5.1** ("no kernel image is available"). Add
+  `gpus_minimum_capability = 8.0` and `gpus_maximum_capability = 9.0` to every GPU submit file. CLAUDE.md §3.5.
 * `mplib` (ManiSkill's planner backend) only has Linux x86_64 wheels. On a Mac `pip install mani_skill` works
   (mplib is Linux-only in its requirements) but the motion planner cannot run. Use `docker/Dockerfile.cpu`.
 * Debian bookworm's software Vulkan (Mesa 22.3) is rejected by SAPIEN 3.0.3 ("Failed to find a supported physical
