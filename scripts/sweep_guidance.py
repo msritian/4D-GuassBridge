@@ -24,7 +24,7 @@ from pathlib import Path
 
 import torch
 
-from eval_motion import load_cases                # scripts/ is on sys.path when this file is run
+from eval_motion import load_cases  # scripts/ is on sys.path when this file is run
 from gaussbridge.eval import metrics as M
 from gaussbridge.guidance.attach import project_attachment
 from gaussbridge.guidance.guide import PhysicsEnergy
