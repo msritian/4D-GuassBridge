@@ -1,0 +1,39 @@
+# C6 guidance-scale sweep on CHTC GPUs (CLAUDE.md §8.3), one job per line of the queue list.
+# Uses the C3 overfit models (chtc/overfit.sub) until a C4 model trained on the full data exists.
+#
+# On your laptop (repo root): build gb_code.tar.gz as chtc/pack.sh does (git archive + the two Panda URDFs), then
+#   scp gb_code.tar.gz chtc/sweep_guidance.{sub,sh} <netid>@<submit node>:~/gaussbridge/sweep/
+# On the submit node (episode and model tars are read from ../overfit/):
+#   cd ~/gaussbridge/sweep && mkdir -p logs && condor_submit sweep_guidance.sub
+# Afterwards: <run>.tar.gz in ~/gaussbridge/sweep.
+
+universe                = container
+container_image         = docker://pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+executable              = sweep_guidance.sh
+arguments               = $(episodes) $(model) $(run) $(extra)
+transfer_input_files    = gb_code.tar.gz, ../overfit/$(episodes), ../overfit/$(model)
+transfer_output_files   = $(run).tar.gz
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+
+request_gpus            = 1
++WantGPULab             = true
++GPUJobLength           = "short"
++is_resumable           = true
+gpus_minimum_memory     = 16G
+# torch 2.5.1 (cu124): no Blackwell kernels (job 8539255), see CLAUDE.md §3.5
+gpus_minimum_capability = 8.0
+gpus_maximum_capability = 9.0
+request_cpus            = 4
+request_memory          = 16GB
+request_disk            = 10GB
+
+log    = logs/$(run)_$(Cluster).log
+output = logs/$(run)_$(Cluster).out
+error  = logs/$(run)_$(Cluster).err
+
+# episodes tar, overfit run tar, run name, extra arguments
+queue episodes, model, run, extra from (
+  episodes_stack_dev.tar, stack_allgoals.tar.gz, sweep_stack, --goals objects,full
+  episodes_pick_dev.tar,  pick_full.tar.gz,      sweep_pick,  --goals full
+)
