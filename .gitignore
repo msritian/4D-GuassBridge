@@ -221,3 +221,8 @@ __marimo__/
 
 # GaussBridge generated data (lives on CHTC staging, not in git)
 data/
+
+# CHTC job files (code tarball, returned shards, job logs)
+chtc/code.tar
+/shards/
+/logs/

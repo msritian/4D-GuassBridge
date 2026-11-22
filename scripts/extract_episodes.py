@@ -2,6 +2,7 @@
 usage: python scripts/extract_episodes.py --split train --out data/episodes/StackCube-v1 data/raw/StackCube-v1/shard_*.h5
 """
 import argparse
+import os
 import subprocess
 import tarfile
 from pathlib import Path
@@ -14,7 +15,8 @@ p.add_argument("--split", required=True)
 p.add_argument("--out", required=True, type=Path)
 a = p.parse_args()
 
-commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+commit = os.environ.get("GIT_COMMIT") or subprocess.run(  # CHTC jobs run from a git archive: chtc/run.sh sets it
+    ["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
 d = a.out / a.split
 d.mkdir(parents=True, exist_ok=True)
 n = 0

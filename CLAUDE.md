@@ -157,6 +157,9 @@ Recommended: build from source with the arch list so jobs don't JIT-compile gspl
 
 ### 3.5 Compute: CHTC (UW–Madison) + Colab
 
+We use CHTC's **HTC system (HTCondor)**. CHTC's separate HPC cluster (Slurm) is not for this project: it has no GPUs,
+allows 10 running jobs per user, and is reserved for multi-node MPI work (CHTC HPC overview, checked 2026-11-13).
+
 Verified from CHTC docs (2026):
 * Submit file basics: `universe = container`, `container_image = docker://<user>/gaussbridge:0.3`,
   `request_gpus = 1`, `+WantGPULab = true`, `+GPUJobLength = "short"` (12 h) | `"medium"` (24 h, default) | `"long"` (7 days),
@@ -171,6 +174,9 @@ Verified from CHTC docs (2026):
   `Requirements = (Target.HasCHTCStaging == true)`. Output: `transfer_output_remaps = "out.tar = file:///staging/s/smittal39/out.tar"`.
   **Few big files** (tar shards), never thousands of small files. Upload/download via `transfer.chtc.wisc.edu`.
   Submit only from `/home`. Ask CHTC for a **group staging dir** so all three accounts share data.
+  The letter subdirectory is new since 2026-06-15 (old `/staging/<netid>` paths are gone); submit files can use
+  `$ENV(STAGING)` instead of hard-coding it. Planner data jobs (`chtc/gen_demos.sub`) return their ~30 MB shards to
+  the submit directory and need no staging; see progress.md "S0.3".
 * CPU jobs (planner data generation) start much faster than GPU jobs: use them.
 * Colab Pro: notebooks for visualisation and quick GPU debugging only (sessions die; no long training).
 
@@ -265,7 +271,9 @@ Motion planner (`mani_skill/examples/motionplanning/panda/`)
 * Grasp construction: `compute_grasp_info_by_obb(get_actor_obb(actor), approaching=[0,0,-1], target_closing=tcp_y, depth=0.025)`
   then `agent.build_grasp_pose(approaching, closing, center)`.
 * Measured: official StackCube demos are 94–108 steps (~5 s); our randomised demos 150–260 steps (7–13 s);
-  planning ≈ 0.5 s per trajectory on one CPU core; ~80–100 % of attempts succeed.
+  planning ≈ 0.5 s per trajectory on one CPU core. Full A4 run (2026-11-21): 0.92 (StackCube) / 0.96 (PickCube) of
+  attempts succeed; ≈ 1.5 s per saved demo on a CHTC CPU core incl. simulation; ~1% of demos take a very long joint
+  path (> 12 rad, up to 2,956 steps), kept and listed in progress.md (A4).
 
 Grasp ("attached") facts from demos
 * While holding a 4 cm cube the finger joint reads ≈ 0.0183 m and the cube centre stays within 5 mm of the TCP

@@ -14,11 +14,12 @@ Status: todo · in progress · done · blocked
 |---|---|---|---|---|
 | S0.1 Repo scaffold [S1] | Amogh (Shivam's task) | done on Windows (2026-11-11); Linux = CI | `pyproject.toml`, `src/gaussbridge/__init__.py`, `tests/conftest.py`, `.gitattributes`, `.github/workflows/tests.yml`, README quick start | `pip install -e ".[dev]"` keeps the installed torch; see S0.1 below |
 | S0.2 Laptops [S1] | each | in progress | Amogh: Windows done for B work (2026-11-10), see "Windows setup" | Macs can't run the planner natively (see Findings); use the CPU image below. Windows can't run the planner either (no mplib) |
-| S0.3 Docker + CHTC [S2] | Aditya | in progress | `docker/Dockerfile.cpu` (CPU, lavapipe) | CUDA image (CLAUDE.md §3.4) and CHTC submit files still todo |
+| S0.3 Docker + CHTC [S2] | Aditya | in progress (CPU part done 2026-11-21) | `docker/Dockerfile.cpu` (pushed as `bejuzb0/gaussbridge-cpu:0.2`), `chtc/` (run.sh, gen_shard.sh, gen_demos.sub + list, interactive.sub) | CPU jobs verified on CHTC (60/60); CUDA image + GPU submit files still todo; see S0.3 below |
 | A1 Randomised planner | Aditya | done (2026-11-06) | `src/gaussbridge/sim/planner_gen.py`, `scripts/gen_demos.py`, `scripts/plot_refs.py`, `tests/test_planner_gen.py` | 80% / 100% success per attempt; see A1 below |
 | A2 Extraction to Episodes | Aditya | done (2026-11-12) | `src/gaussbridge/sim/extract.py`, `scripts/extract_episodes.py`, `tests/test_extract.py` | 24/24 dev demos: one grasp interval, finger 18.3 mm; see A2 below |
 | A3 Physics replay [A2] | Aditya | done (2026-11-13) | `src/gaussbridge/sim/replay.py`, `scripts/replay_episodes.py` | 40/40 succeed after round trip, end error ≤ 5.6 mm (bound 1 cm); see A3 below |
-| A4–A7 | Aditya | todo | — | |
+| A4 Full datasets | Aditya | done (2026-11-21) | release `data-a4-v1`, `data_stats/*.json`, `scripts/dataset_stats.py` | 24,096 episodes, all splits within 1% of plan, replay 20/20 per task; see A4 below |
+| A5–A7 | Aditya | todo | — | |
 | B1 Capture environments | Amogh | done (2026-11-11) | `src/gaussbridge/sim/envs.py`, `src/gaussbridge/sim/capture.py`, `geometry.backproject`, `tests/test_capture.py`, `scripts/check_lighting.py`, `results/lighting/` | reprojection agreement 99.94–99.96%; lighting confirmed (21 dB cap); see B1 below |
 | B2 Asset-mode captures | Amogh | done (2026-11-11) | `sim/capture.py` (`random_configs`, `apply_config`, `capture_configs`, `view_valid`, save/load), `scripts/capture_assets.py`, `tests/test_configs.py`, `results/b2/` | every visual robot link in ≥ 67 training views (need 20); see B2 below |
 | B3 PartSplats + composition | Amogh | done (2026-11-12) | `src/gaussbridge/gs/{splats,raster,render}.py`, `geometry.viewmat_to_campos`, `tests/test_splats.py`, `scripts/check_splats_capture.py`, `results/b3/` | dense rasteriser vs gsplat 2.3e-6; part+camera rotation invariance 2e-5; lit colour model built; see B3 below |
@@ -152,6 +153,70 @@ All pass with the object end-error bound at **1 cm** (decided 2026-11-13; TASKS.
 recorded demos replay up to 6 mm off: replaying measured joint positions as targets (§6.2 actions) lets objects
 settle a few mm differently, independent of the round trip, so 5 mm flagged good demos. Both tasks' success
 tolerances are ≥ 25 mm, and 1 cm matches the §8.3 release-error rejection threshold.
+
+## S0.3 — CHTC CPU jobs (planner data for A4)
+
+* Image: **`bejuzb0/gaussbridge-cpu:0.2`** on Docker Hub (public: CHTC pulls `docker://` images without a login; it
+  holds only open-source packages, our code ships with each job). 3.5 GB, built from `docker/Dockerfile.cpu`.
+  Rebuild → push under a **new tag** (CHTC caches tags).
+* `chtc/run.sh` (any job): unpacks `code.tar` (made with `git archive`, so `$GIT_COMMIT` = the exact commit, written
+  into every Episode's meta), sets `PYTHONPATH`, `HOME` = scratch dir and lavapipe, runs the command, packs `./out`.
+* `chtc/gen_shard.sh <task> <split> <seed_start> <num_seeds> <refs>`: A1 generation + A2 extraction for one shard.
+* `chtc/gen_demos.sub` + `chtc/gen_demos.txt`: 60 jobs = every split of CLAUDE.md §6.1 for both tasks (50 seeds per
+  job). Each returns `shards/<task>_<split>_<seed_start>.tar` (raw shard + Episodes, ≤ 30 MB) to the submit
+  directory (`/home`; files < 1 GB need no `/staging`). `chtc/smoke.txt` = one 2-seed shard.
+  `chtc/interactive.sub` = debugging session in the image (`condor_submit -i`).
+
+**Run (from /home on an access point; off campus the UW VPN is needed, port 22 is closed otherwise):**
+```bash
+git clone https://github.com/msritian/4D-GuassBridge.git && cd 4D-GuassBridge
+git archive -o chtc/code.tar HEAD && mkdir -p shards logs
+condor_submit chtc/gen_demos.sub          # smoke test first: last line "... from chtc/smoke.txt"
+condor_watch_q                            # CHTC asks for this instead of `watch condor_q`
+```
+
+**Verified on CHTC (ap2002, 2026-11-21):**
+| Run | Cluster | Result | Wall time | Resources used (requested) |
+|---|---|---|---|---|
+| smoke, 2 seeds × 2 refs | 8921124 | 4/4 demos, exit 0 | 2 min submit → tar back (18 s executing) | CPU 0.86, memory 550 MB (4 GB), disk 17 MB (4 GB) |
+| full, 60 jobs | 8921291 | 60/60 exit 0, no holds | ≈ 15 min (58 started within 1 min; the 800-demo test shards finish last) | — |
+Requests lowered to 2 GB memory / 2 GB disk from the smoke numbers (CHTC: tune requests from the job log). The image
+download does not count against `request_disk`. Still todo for S0.3: the CUDA image (CLAUDE.md §3.4) and GPU submit
+files, for A5 / B5.
+
+## A4 — full datasets
+
+**Where:** GitHub release **`data-a4-v1`** (public): `<task>_episodes_<split>.tar` (Episodes), `<task>_raw_<split>.tar`
+(ManiSkill h5/json/knobs per shard, for `replay_trajectory --use-env-states`), `<task>_stats.json`, job logs,
+`SHA256SUMS`. 1.6 GB in total. Not in git; no `/staging` copy (the team shares through the release).
+```bash
+gh release download data-a4-v1 -R msritian/4D-GuassBridge -p 'StackCube-v1_episodes_*' -p SHA256SUMS
+```
+Stats: `data_stats/<task>.json` (`python scripts/dataset_stats.py --episodes data/episodes/<task> --logs <job logs>
+--out data_stats/<task>.json`): counts per split, planner success, lengths, train log-duration μ/σ, joint and
+object ranges.
+
+**Acceptance** (counts within 10% of plan; 20 random train episodes replay):
+| Split (seeds × refs) | StackCube-v1 | PickCube-v1 |
+|---|---|---|
+| train (0–1499 / 0–999 × 8) | 11,925 / 12,000 | 7,986 / 8,000 |
+| val (10000–10049 × 8) | 399 / 400 | 400 / 400 |
+| test (20000–20099 × 16) | 1,588 / 1,600 | 1,599 / 1,600 |
+| policy_real (30000–30099 × 1) | 99 / 100 | 100 / 100 |
+| planner success per attempt | 14,011 / 15,297 = **0.92** | 10,085 / 10,523 = **0.96** |
+| length median / p99 / max (steps) | 172 / 364 / 2,956 | 156 / 261 / 683 |
+| train log-duration μ / σ | 2.168 / 0.249 | 2.061 / 0.225 |
+| replay 20 random train episodes | **20/20**, end error ≤ 18.5 mm | **20/20**, ≤ 3.3 mm |
+Every split within 1% of plan. StackCube's per-attempt success is 0.92 on the full run (A1's 0.80 was 15 attempts).
+
+**Known outliers (kept, decided 2026-11-21; filter in training if they hurt):**
+* **Wild joint paths:** total joint travel > 12 rad (median 5.5, p99 11.4): StackCube 123 episodes (0.9%), PickCube
+  25 (0.25%); 88 of the StackCube ones are also > 400 steps. The arm moves the whole time (no idling): the planner
+  takes a long way round. PickCube's are all RRT transports; StackCube's mostly screw moves. Longest: StackCube
+  test `20009_06` (2,956 steps, 32.8 rad).
+* **No grasp interval:** 9 StackCube episodes where cubeA is never `attached` by the §5 rule although the task
+  succeeds (likely pushed rather than carried, e.g. train `00287_07`). All other episodes: exactly one interval.
+* **Replay drift:** StackCube train `00288_07` (a normal 132-step demo) replays 18.5 mm off at the end, still a success.
 
 ## S0.1 — repo scaffold
 
