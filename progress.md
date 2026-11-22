@@ -14,15 +14,17 @@ Status: todo · in progress · done · blocked
 |---|---|---|---|---|
 | S0.1 Repo scaffold [S1] | Amogh (Shivam's task) | done on Windows (2026-11-11); Linux = CI | `pyproject.toml`, `src/gaussbridge/__init__.py`, `tests/conftest.py`, `.gitattributes`, `.github/workflows/tests.yml`, README quick start | `pip install -e ".[dev]"` keeps the installed torch; see S0.1 below |
 | S0.2 Laptops [S1] | each | in progress | Amogh: Windows done for B work (2026-11-10), see "Windows setup" | Macs can't run the planner natively (see Findings); use the CPU image below. Windows can't run the planner either (no mplib) |
-| S0.3 Docker + CHTC [S2] | Aditya | in progress | `docker/Dockerfile.cpu`, `chtc/` (run.sh, gen_shard.sh, gen_demos.sub + list, interactive.sub) | CPU jobs done and simulated locally; image push + first CHTC run (Aditya's accounts) and the CUDA image still todo; see S0.3 below |
+| S0.3 Docker + CHTC [S2] | Aditya | in progress (CPU part done 2026-11-21) | `docker/Dockerfile.cpu` (pushed as `bejuzb0/gaussbridge-cpu:0.2`), `chtc/` (run.sh, gen_shard.sh, gen_demos.sub + list, interactive.sub) | CPU jobs verified on CHTC (60/60); CUDA image + GPU submit files still todo; see S0.3 below |
 | A1 Randomised planner | Aditya | done (2026-11-06) | `src/gaussbridge/sim/planner_gen.py`, `scripts/gen_demos.py`, `scripts/plot_refs.py`, `tests/test_planner_gen.py` | 80% / 100% success per attempt; see A1 below |
 | A2 Extraction to Episodes | Aditya | done (2026-11-12) | `src/gaussbridge/sim/extract.py`, `scripts/extract_episodes.py`, `tests/test_extract.py` | 24/24 dev demos: one grasp interval, finger 18.3 mm; see A2 below |
-| A3 Physics replay [A2] | Aditya | todo | — | |
-| A4–A7 | Aditya | todo | — | |
+| A3 Physics replay [A2] | Aditya | done (2026-11-13) | `src/gaussbridge/sim/replay.py`, `scripts/replay_episodes.py` | 40/40 succeed after round trip, end error ≤ 5.6 mm (bound 1 cm); see A3 below |
+| A4 Full datasets | Aditya | done (2026-11-21) | release `data-a4-v1`, `data_stats/*.json`, `scripts/dataset_stats.py` | 24,096 episodes, all splits within 1% of plan, replay 20/20 per task; see A4 below |
+| A5–A7 | Aditya | todo | — | |
 | B1 Capture environments | Amogh | done (2026-11-11) | `src/gaussbridge/sim/envs.py`, `src/gaussbridge/sim/capture.py`, `geometry.backproject`, `tests/test_capture.py`, `scripts/check_lighting.py`, `results/lighting/` | reprojection agreement 99.94–99.96%; lighting confirmed (21 dB cap); see B1 below |
 | B2 Asset-mode captures | Amogh | done (2026-11-11) | `sim/capture.py` (`random_configs`, `apply_config`, `capture_configs`, `view_valid`, save/load), `scripts/capture_assets.py`, `tests/test_configs.py`, `results/b2/` | every visual robot link in ≥ 67 training views (need 20); see B2 below |
 | B3 PartSplats + composition | Amogh | done (2026-11-12) | `src/gaussbridge/gs/{splats,raster,render}.py`, `geometry.viewmat_to_campos`, `tests/test_splats.py`, `scripts/check_splats_capture.py`, `results/b3/` | dense rasteriser vs gsplat 2.3e-6; part+camera rotation invariance 2e-5; lit colour model built; see B3 below |
-| B4–B8 | Amogh | todo | — | |
+| B4 Articulated reconstruction | Amogh | in progress (2026-11-12) | — | |
+| B5–B8 | Amogh | todo | — | |
 | C1 Geometry + trajectory core | Aditya (Shivam's task) | done (2026-11-06) | `src/gaussbridge/geometry.py`, `src/gaussbridge/trajectory.py`, `tests/test_geometry.py`, `tests/test_trajectory.py`, `tests/test_sim_integration.py` | 24/24 planner demos replay after the 128-step round trip; see C1 below |
 | C2 Kinematics (PandaFK) [none] | Amogh (Shivam's task) | done (2026-11-11) | `src/gaussbridge/sim/kinematics.py`, `tests/test_kinematics.py` | link poses vs sim ≤ 9.1e-7 m on 50 random configs, both robots; see C2 below |
 | C3–C9 | Shivam | todo | — | |
@@ -93,8 +95,7 @@ Diversity plot: `python scripts/plot_refs.py data/raw/StackCube-v1/dev StackCube
 | PickCube-v1 | 12/12 | 0.0014 rad | 5.6 mm |
 
 PickCube's end error is mostly not from resampling: replaying measured qpos as targets (the §6.2 action definition)
-already gives up to 3.3 mm vs 0.7–2.0 mm with the planner's own actions. **A3: the 5 mm bound is tight for
-PickCube** (1/12 above it, success tolerance is 25 mm); consider 1 cm.
+already gives up to 3.3 mm vs 0.7–2.0 mm with the planner's own actions. A3's bound is now 1 cm (see A3).
 
 **Decisions made:**
 * Gripper / attached are resampled by nearest sample (keeps endpoints exact); recorded in CLAUDE.md §6.3.
@@ -128,41 +129,94 @@ holds at the end, knobs sidecar matched by episode id. `test_sim_integration.py`
 The first held step reads ≈ 20.5 mm (fingers still closing), then 18.3 mm. CLAUDE.md §5 said "1–3 mm" to the TCP;
 updated to ≤ 5 mm.
 
+## A3 — physics replay
+
+```bash
+python scripts/replay_episodes.py data/episodes/StackCube-v1/train/*.npz --n 20 [--round-trip]   # A4 acceptance
+```
+`sim.replay.replay(ep, env=None)` resets with `ep.meta["seed"]` (raises if that does not reproduce the episode's
+start, > 1 mm), runs `ep.actions()` + 10 hold steps (`pd_joint_pos`, physx_cpu) and returns
+`{"success", "obj_end_err" [K] m}`. Reuse one simulator with `make_env(env_id)`. Generated episodes need
+`meta["env_id"]` and `meta["seed"]` (the start seed) to be replayable.
+
+**Tests:** `test_sim_integration.py`'s round-trip test now replays with `replay()` and also checks that a demo cut
+halfway is reported as a failure (so the check can fail).
+
+**Acceptance** (5 seeds × 4 refs per task, seeds 0–4, round trip = Episode → 128-step motion → Episode):
+| Task | Replay | Success | Max joint path error | Max object end error |
+|---|---|---|---|---|
+| StackCube-v1 | round trip | 20/20 | 0.0015 rad | 3.96 mm |
+| StackCube-v1 | as recorded | 20/20 | — | 5.97 mm |
+| PickCube-v1 | round trip | 20/20 | 0.0014 rad | 5.64 mm |
+| PickCube-v1 | as recorded | 20/20 | — | 3.4 mm |
+All pass with the object end-error bound at **1 cm** (decided 2026-11-13; TASKS.md said 5 mm). Even unmodified
+recorded demos replay up to 6 mm off: replaying measured joint positions as targets (§6.2 actions) lets objects
+settle a few mm differently, independent of the round trip, so 5 mm flagged good demos. Both tasks' success
+tolerances are ≥ 25 mm, and 1 cm matches the §8.3 release-error rejection threshold.
+
 ## S0.3 — CHTC CPU jobs (planner data for A4)
 
+* Image: **`bejuzb0/gaussbridge-cpu:0.2`** on Docker Hub (public: CHTC pulls `docker://` images without a login; it
+  holds only open-source packages, our code ships with each job). 3.5 GB, built from `docker/Dockerfile.cpu`.
+  Rebuild → push under a **new tag** (CHTC caches tags).
 * `chtc/run.sh` (any job): unpacks `code.tar` (made with `git archive`, so `$GIT_COMMIT` = the exact commit, written
   into every Episode's meta), sets `PYTHONPATH`, `HOME` = scratch dir and lavapipe, runs the command, packs `./out`.
 * `chtc/gen_shard.sh <task> <split> <seed_start> <num_seeds> <refs>`: A1 generation + A2 extraction for one shard.
 * `chtc/gen_demos.sub` + `chtc/gen_demos.txt`: 60 jobs = every split of CLAUDE.md §6.1 for both tasks (50 seeds per
-  job, 24,200 demos: StackCube 14,100, PickCube 10,100). Each returns `shards/<task>_<split>_<seed_start>.tar`
-  (raw shard + Episodes, ~30 MB) to the submit directory, so no `/staging` is needed for generation.
-  `chtc/smoke.txt` = one 2-seed shard for a first test. `chtc/interactive.sub` = debugging session in the image.
-* **Simulated locally** (CPU image, empty scratch dir, non-root user): 2 seeds × 2 refs → 4 demos, 4 Episodes in
-  `out.tar`, 13 s under emulation; commit id read from a `git archive` tarball and stored in Episode meta.
+  job). Each returns `shards/<task>_<split>_<seed_start>.tar` (raw shard + Episodes, ≤ 30 MB) to the submit
+  directory (`/home`; files < 1 GB need no `/staging`). `chtc/smoke.txt` = one 2-seed shard.
+  `chtc/interactive.sub` = debugging session in the image (`condor_submit -i`).
 
-**To run on CHTC (anyone on the team with a CHTC HTC account):**
-1. **Image, once for the team** (whoever has Docker; on a Mac add `--platform linux/amd64` to the build). The Docker
-   Hub repo must be **public** so CHTC can pull it without a login:
-   ```bash
-   docker build --platform linux/amd64 -f docker/Dockerfile.cpu -t <dockerhub_user>/gaussbridge-cpu:0.2 .
-   docker push <dockerhub_user>/gaussbridge-cpu:0.2
-   ```
-2. **On a CHTC HTC submit node, in /home** (the submitter's own account):
-   ```bash
-   git clone https://github.com/msritian/4D-GuassBridge.git && cd 4D-GuassBridge
-   sed -i 's/CHANGE_ME/<dockerhub_user>/' chtc/*.sub
-   git archive -o chtc/code.tar HEAD && mkdir -p shards logs
-   ```
-3. **Smoke test:** change the last line of `chtc/gen_demos.sub` to `... from chtc/smoke.txt`, run
-   `condor_submit chtc/gen_demos.sub`, wait for `shards/StackCube-v1_smoke_0.tar` (`tar -tf` it: 4 `.npz` + a raw
-   shard). Note the run time in `logs/*.out`.
-4. **Full run:** change the line back to `chtc/gen_demos.txt` and submit again (60 jobs). Watch with `condor_q`.
-5. **Hand-off for A4:** the 60 tars (~1.7 GB) land in the submitter's `shards/`. Tell Aditya, then either copy them
-   to the group staging dir (once CHTC creates it) or share the folder path.
+**Run (from /home on an access point; off campus the UW VPN is needed, port 22 is closed otherwise):**
+```bash
+git clone https://github.com/msritian/4D-GuassBridge.git && cd 4D-GuassBridge
+git archive -o chtc/code.tar HEAD && mkdir -p shards logs
+condor_submit chtc/gen_demos.sub          # smoke test first: last line "... from chtc/smoke.txt"
+condor_watch_q                            # CHTC asks for this instead of `watch condor_q`
+```
 
-Not verified (no CHTC access from here): the submit files themselves; `condor_submit` reports syntax errors at once,
-and the smoke test catches the rest. Still todo for S0.3: the CUDA image (CLAUDE.md §3.4) and GPU submit files, for
-A5 / B4 / C4.
+**Verified on CHTC (ap2002, 2026-11-21):**
+| Run | Cluster | Result | Wall time | Resources used (requested) |
+|---|---|---|---|---|
+| smoke, 2 seeds × 2 refs | 8921124 | 4/4 demos, exit 0 | 2 min submit → tar back (18 s executing) | CPU 0.86, memory 550 MB (4 GB), disk 17 MB (4 GB) |
+| full, 60 jobs | 8921291 | 60/60 exit 0, no holds | ≈ 15 min (58 started within 1 min; the 800-demo test shards finish last) | — |
+Requests lowered to 2 GB memory / 2 GB disk from the smoke numbers (CHTC: tune requests from the job log). The image
+download does not count against `request_disk`. Still todo for S0.3: the CUDA image (CLAUDE.md §3.4) and GPU submit
+files, for A5 / B5.
+
+## A4 — full datasets
+
+**Where:** GitHub release **`data-a4-v1`** (public): `<task>_episodes_<split>.tar` (Episodes), `<task>_raw_<split>.tar`
+(ManiSkill h5/json/knobs per shard, for `replay_trajectory --use-env-states`), `<task>_stats.json`, job logs,
+`SHA256SUMS`. 1.6 GB in total. Not in git; no `/staging` copy (the team shares through the release).
+```bash
+gh release download data-a4-v1 -R msritian/4D-GuassBridge -p 'StackCube-v1_episodes_*' -p SHA256SUMS
+```
+Stats: `data_stats/<task>.json` (`python scripts/dataset_stats.py --episodes data/episodes/<task> --logs <job logs>
+--out data_stats/<task>.json`): counts per split, planner success, lengths, train log-duration μ/σ, joint and
+object ranges.
+
+**Acceptance** (counts within 10% of plan; 20 random train episodes replay):
+| Split (seeds × refs) | StackCube-v1 | PickCube-v1 |
+|---|---|---|
+| train (0–1499 / 0–999 × 8) | 11,925 / 12,000 | 7,986 / 8,000 |
+| val (10000–10049 × 8) | 399 / 400 | 400 / 400 |
+| test (20000–20099 × 16) | 1,588 / 1,600 | 1,599 / 1,600 |
+| policy_real (30000–30099 × 1) | 99 / 100 | 100 / 100 |
+| planner success per attempt | 14,011 / 15,297 = **0.92** | 10,085 / 10,523 = **0.96** |
+| length median / p99 / max (steps) | 172 / 364 / 2,956 | 156 / 261 / 683 |
+| train log-duration μ / σ | 2.168 / 0.249 | 2.061 / 0.225 |
+| replay 20 random train episodes | **20/20**, end error ≤ 18.5 mm | **20/20**, ≤ 3.3 mm |
+Every split within 1% of plan. StackCube's per-attempt success is 0.92 on the full run (A1's 0.80 was 15 attempts).
+
+**Known outliers (kept, decided 2026-11-21; filter in training if they hurt):**
+* **Wild joint paths:** total joint travel > 12 rad (median 5.5, p99 11.4): StackCube 123 episodes (0.9%), PickCube
+  25 (0.25%); 88 of the StackCube ones are also > 400 steps. The arm moves the whole time (no idling): the planner
+  takes a long way round. PickCube's are all RRT transports; StackCube's mostly screw moves. Longest: StackCube
+  test `20009_06` (2,956 steps, 32.8 rad).
+* **No grasp interval:** 9 StackCube episodes where cubeA is never `attached` by the §5 rule although the task
+  succeeds (likely pushed rather than carried, e.g. train `00287_07`). All other episodes: exactly one interval.
+* **Replay drift:** StackCube train `00288_07` (a normal 132-step demo) replays 18.5 mm off at the end, still a success.
 
 ## S0.1 — repo scaffold
 
@@ -284,6 +338,55 @@ Two findings for B4: (a) the far floor (> 3 m, dropped by §7.2's init rule) is 
 must be modelled; (b) blurry init Gaussians of `panda_hand` (sized for the far rings) bleed into the bottom of the
 hand camera from ~3 cm away; label errors there are almost all `panda_hand`, which training on hand-camera views
 should fix.
+
+## B4 — articulated reconstruction
+
+**Run:** `python scripts/train_recon.py --captures data/assets/<task>/captures.pt` (30k iterations; `--set key=value`
+overrides any `ReconConfig` field). Writes `scene.splats.pt`, `background.pt`, `<object>.points.npy` and
+`recon.json` next to the captures, and `results/b4/<task>.recon.{json,png}`.
+
+**What exists**
+* `gs/recon.py`: `reconstruct(cap, ReconConfig)` → (PartSplats, EnvMap, info). Init by back-projecting every training
+  configuration into part frames (normals from depth); loss `0.8·L1 + 0.2·(1−SSIM) + 1.0·depth + 0.05·label CE +
+  0.1·mask`; gsplat `DefaultStrategy` densification (non-trainable `part_id`, albedo, normals carried along);
+  optional `PoseRefiner` (se(3) per config × part, config 0 fixed). `evaluate` / `summarize` for held-out metrics.
+* `gs/background.py`: `EnvMap`, background colour per world ray direction for the ground beyond 2.5 m and the sky
+  (B3 finding (a)). `render(..., env=)` composites it; **B5 must load `background.pt` and pass it**.
+* `geometry.pixel_rays`, `init_from_points(point_R=)` (colours seen in several configurations).
+* `tests/test_recon.py` (9, CPU): pixel rays, EnvMap wrap/save, compositing, depth normals of a plane, far-ground
+  relabelling, pose refinement recovers a 1.5 cm offset to < 4 mm, end-to-end synthetic reconstruction
+  generalises to a held-out configuration (28–34 dB). Full suite 43 passed.
+
+**Acceptance** (held-out configurations 8 and 9; 30k iterations, 66 / 63 min on an RTX 4060 laptop):
+| Task | base_camera 128² | rings 256² (capture res) | label acc (base / rings) | hand_camera 128² | Gaussians |
+|---|---|---|---|---|---|
+| StackCube-v1 | **30.8 dB** (32.4 / 29.2), SSIM 0.93 | **28.3 dB** (min 23.7), SSIM 0.89 | **99.3% / 99.6%** | 24.9 dB (23.7 / 26.0), SSIM 0.75 | 1.42M (1.08M table) |
+| PickCube-v1 | **31.8 dB** (34.7 / 28.8), SSIM 0.94 | **28.6 dB** (min 23.7), SSIM 0.89 | **99.2% / 99.6%** | — (no hand camera) | 1.31M (1.02M table) |
+Targets (TASKS.md B4): ≥ 28 dB base_camera, ≥ 26 dB capture res, ≥ 95% labels. base_camera mask IoU 0.989
+(B3 raw init: 0.77; the far floor is fixed).
+
+**Known weakness: hand camera (≈ 25 dB, not part of the acceptance).** Geometry and labels are right (IoU 0.999,
+labels 99.8%); the loss is close-up texture: the wood grain the hand camera sees from a few cm is blurred, and the
+table's view-dependent specular streak is missing. Main cause: only 8 hand-camera training views, so the table
+patches it sees in a new configuration were only observed from the rings (≥ 0.5 m away); the degree-1 SH
+residual cannot form a sharp highlight. Plan: measure it on real trajectories in B5 (mostly cubes and fingers in
+view); if < ~26 dB there, capture ~40 extra configurations with only the policy cameras (0.34 s each) and/or raise
+the SH degree. Asset size: 176 MB, 76% of Gaussians on the table (densification chases the wood grain).
+
+**Shape points for C3/C6 (changed vs CLAUDE.md §6.4's first plan).** After training, a cube is ~11k faint
+(opacity < 0.1) surface Gaussians around ~2.3k opaque 5 mm blobs centred ≈ 9 mm from the middle. Renders are right,
+but "centres of Gaussians with opacity > 0.5" only reach ±13–15 mm on a ±20 mm cube (30% too small; collision spheres
+from them would miss contacts). `gs.render.surface_points` samples the rendered surface instead: median 18.9 mm,
+colours red/green as expected. `cubeA/cubeB.points.npy` (StackCube) and `cube.points.npy` (PickCube, median 18.8 mm),
+512 × [xyz, rgb] in the cube frame, are committed in `artifacts/assets/<task>/` for C3.
+
+**Open issue: floaters.** Both models have background (`table-workspace`) Gaussians hovering 3–7 cm above the table,
+some coloured like a cube (red ≈ (0.95, 0.24, 0.15), opacity 0.3–0.4). They show up as small specks in every
+held-out view: base_camera 25 px (StackCube) / 42 px (PickCube) over 2 views, rings ≈ 100 px per 256² view
+(counted as: rendered table, captured table, rendered depth ≥ 1 cm in front, colour error > 0.15). Tiny for PSNR,
+but a red 4-px speck on the table looks like a distant cube to a policy (the real cube is ~8-10 px wide in base_camera).
+Likely cause: a Gaussian between some training camera and the cube gets coloured to match the cube pixels behind it,
+and nothing removes it — gsplat 1.5.3's opacity reset never fires (CLAUDE.md §7.2) and the label term is weak (0.05).
 
 ## Windows setup (Amogh, 2026-11-10; RTX 4060 Laptop 8 GB, driver 616.56)
 
